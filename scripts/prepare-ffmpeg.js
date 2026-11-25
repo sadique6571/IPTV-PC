@@ -137,7 +137,11 @@ async function main() {
       fs.copyFileSync(src, dest);
       // Static checks only — a Windows exe cannot run its -version here.
       const buf = fs.readFileSync(dest);
-      if (buf.subarray(0, 2).toString('ascii') !== 'MZ' || buf.indexOf('PE\0\0', 0, 512) < 0) {
+      // NOTE: Buffer.indexOf(value, byteOffset, encoding) takes an ENCODING
+      // as its 3rd argument — passing 512 there ("search the first 512
+      // bytes") throws "Unknown encoding: 512" on Node 20 (CI), even
+      // though Node 24 here tolerates it. Search a 512-byte slice instead.
+      if (buf.subarray(0, 2).toString('ascii') !== 'MZ' || buf.subarray(0, 512).indexOf('PE\0\0') < 0) {
         throw new Error('staged ffmpeg.exe is not a PE32+ Windows binary');
       }
       if (!buf.includes(Buffer.from('libx264', 'ascii'))) {
