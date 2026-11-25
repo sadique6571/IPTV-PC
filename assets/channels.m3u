@@ -1,0 +1,219 @@
+#EXTM3U
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://yt3.ggpht.com/q9ws610ItGBIJYqXxI2tYmVOeEO0JKATBBZPGS19lUheJfKrPdkEInElqjGL-ZCQneVzSJgYpg=s176-c-k-c0x00ffffff-no-rj-mo",MUN TV
+http://103.86.132.58:9981/stream/channelid/1072161365
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/uu0UJme.png",A Plus
+https://cdn4.mjunoon.tv:8087/streamtest/118H/chunks.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="pan" tvg-logo="https://i.imgur.com/ICSA4W6.png",Apna Channel
+https://cdn4.mjunoon.tv:8087/streamtest/134H/chunks.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://yt3.googleusercontent.com/ytc/AIdro_k3vC3CiYp-MhUm9ALQXV0BhpEU5gE_k_EETyGjR_FVYQ=s176-c-k-c0x00ffffff-no-rj-mo",Hum Sitaray
+https://live.msnetworks.net/hum-sitaray/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://yt3.ggpht.com/DtPjYiYQmNE3qGko36l8Oxy31GGjN3TnsG4l0j2w8MzTOwsCqVoSdolIJhCZZF9b7kp_9LYk=s176-c-k-c0x00ffffff-no-rj-mo",InPlus Pakistan
+https://live.msnetworks.net/in-plus/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/n4CenYn.png",LTN Family
+https://cdn4.mjunoon.tv:8087/streamtest/158-2M/chunks.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://yt3.ggpht.com/HblhpAEvRtA5WFNvGYhSA-mNc3WHbgO_GrGRHQ3PyVeTKl46ZTjTb8UNDFfG3blulO3GVr7VWLQ=s176-c-k-c0x00ffffff-no-rj-mo",M Entertainment
+https://cdn.rabta.stream/ME/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://yt3.ggpht.com/1nVeYLxEc6eOQ_2lelK6KkiMha0basRiJBqzaUT61Hq7GqRN8nQxoouxfEBWr9b-YxPmF3YEpQ=s176-c-k-c0x00ffffff-no-rj-mo",PTV Global
+https://live.msnetworks.net/ptv-global/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://yt3.ggpht.com/TWkHM8hnfp7URbHIuiwLHXJOE1FhtygWKQokbSmnNhyiAjQYp0zFHlHLw5ygRvXC_rSHIH_t4Q=s176-c-k-c0x00ffffff-no-rj-mo",PTV Home
+https://live.msnetworks.net/ptv-home/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/BnNNDrE.png",Play Entertainment
+https://cdn4.mjunoon.tv:8087/streamtest/105H/chunks.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/Xn3XxMY.png",TV One
+https://cdn4.mjunoon.tv:8087/streamtest/129H/chunks.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/Aan_TV.png/250px-Aan_TV.png",Aan TV
+https://live.msnetworks.net/aan-tv/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e8/Ary_Digital_Logo.png/250px-Ary_Digital_Logo.png",ARY Digital
+https://live.msnetworks.net/ary-digital/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/rgHbb8W.png",Express Entertainment
+https://live.msnetworks.net/express-ent/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d1/Green_Entertainment.jpg/250px-Green_Entertainment.jpg",Green Entertainment
+https://live.msnetworks.net/green-tv/master.m3u8
+#EXTINF:-1 group-title="News" tvg-country="PK" tvg-language="urd" tvg-logo="https://upload.wikimedia.org/wikipedia/en/9/93/24_News_HD_Logo.png",24 News HD
+https://live.msnetworks.net/24-news/master.m3u8
+#EXTINF:-1 group-title="News" tvg-country="PK" tvg-language="urd" tvg-logo="https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/GEO_News_logo_in_Urdu.png/250px-GEO_News_logo_in_Urdu.png",Geo News
+https://live.msnetworks.net/geo-news/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.ibb.co/Kc0xHyBb/8XM-Logo.png",8XM
+https://vodzong.mjunoon.tv:8087/streamtest/8XM-131/playlist.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/GfWLn3O.jpg",aurLife HD
+https://live.msnetworks.net/aur-life/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/eajSRFo.png",Bol Entertainment HD
+https://vodzong.mjunoon.tv:8087/streamtest/Channel5-159-4/playlist.m3u8
+#EXTINF:-1 group-title="Kids" tvg-country="PK" tvg-language="urd" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Cartoon_Network_2010_logo.svg/960px-Cartoon_Network_2010_logo.svg.png",Cartoon Network (Pakistan)
+https://vodzong.mjunoon.tv:8087/streamtest/cartoon-network-87/live/87H/chunks.m3u8
+#EXTINF:-1 group-title="News" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/1PbtW0y.png",Dunya News
+https://imob.dunyanews.tv/livehd/ngrp:dunyalivehd_2_all/playlist.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd;pan" tvg-logo="https://i.imgur.com/2TqlNsI.png",Falak TV
+https://falak.rst.ae/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.ibb.co/Tx4GfKT5/Hum-TV-HD.png",Hum TV
+https://g4wlkwx8l23a-hls-live.5centscdn.com/HUM/271ddf829afeece44d8732757fba1a66.sdp/playlist_dvr.m3u8
+#EXTINF:-1 group-title="News" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/bQfQeEA.jpeg",Lahore News
+https://vcdn.dunyanews.tv/lahorelive/ngrp:lnews_1_all/playlist.m3u8
+#EXTINF:-1 group-title="News" tvg-country="PK" tvg-language="urd" tvg-logo="https://mnews.pk/wp-content/uploads/2025/10/mnews-logo-news.png",M News
+https://cdn.rabta.stream/M-News/index.m3u8
+#EXTINF:-1 group-title="Islamic" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/MitLeCJ.png",Madani Channel Urdu
+https://streaming.madanichannel.tv/static/streaming-playlists/hls/b9790f10-cb0d-4e30-82bf-84a756234e58/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://papaji.freetvindia.com/media/1655_FreeTV_Paigam.png",Paigham Television
+https://samitaorigin.tangotv.in/PAIGAMTV/SAMITAORIGIN/index.m3u8
+#EXTINF:-1 group-title="News" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/yYMh3JJ.png",Such TV
+https://video.primexsports.com/suchnews/live/playlist.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://yt3.googleusercontent.com/U4INXhwmEUOABHoemQBpI6C9t4jb9iBmDvZ3ZT3lAb9Au_jVl32NL8XDpy-9cBjRJ2LP69Ovzg=s900-c-k-c0x00ffffff-no-rj",All Time Movies
+https://fta.ektv.in/live/54/54_0.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://yt3.ggpht.com/7hzIcNJjm3pILiwEeKfk0KpNzXZ1C04TBu8vdlbW7HHjZYub5wxQReB-eN7EJzJnnDpNWNtTOQ=s176-c-k-c0x00ffffff-no-rj-mo",Alright! TV
+https://d3c7vdfq3tyeyw.cloudfront.net/v1/master/071c0467fcd02420cdf0d8a1ca3524b96c27a151/rusk_media/v1/channel/ruskmedia/germane.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://i.imgur.com/sh0yFSf.png",Anjan TV
+https://anjan.vstream.online/anjanorg/ngrp:anjan_hdall/playlist.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://dtil.tmsimg.com/assets/s142695_ld_h15_aa.png?lock=720x540",B4U Kadak
+https://amg00877-b4unew-amg00877c4-xiaomi-in-5473.playouts.now.amagi.tv/playlist.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://i.imgur.com/M9kMFJl.png",B4U Movies
+https://amg00877-b4unew-amg00877c2-xiaomi-in-5489.playouts.now.amagi.tv/playlist.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://i.imgur.com/hytapio.png",B4U Music
+https://amg00877-b4unew-amg00877c3-xiaomi-in-5474.playouts.now.amagi.tv/720p/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://yt3.googleusercontent.com/ytc/AIdro_m0l3XpbYRqQc9TuuxeQt95r3Rmftxsvy5viy2X7F-16Q=s176-c-k-c0x00ffffff-no-rj-mo",Balle Balle HD
+https://mcncdndigital.com/balleballetv/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://yt3.ggpht.com/IAfT9GqVf3w9V2dfIS24X59_MISHwjA0WawtEFNm2vsF8Lcj4MSblQd1rTEIlD1AYKQI_4VxAA=s176-c-k-c0x00ffffff-no-rj-mo",Boogle Bollywood
+https://yuppnimrestreammum.akamaized.net/181224/smil:bogglebollywood.smil/playlist.m3u8?hdnts=st=1735898689~exp=1835898688~acl=*~hmac=f5fe24724fe05481e3841f9eb5ab8efdee0a3dd83645ae9dcf45703f525bab7b
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://i.imgur.com/M8uCJ0D.png",Colors
+https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/sg/YuppTV/ColorsAPAC.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://thumb.wikimedia.org/wikipedia/commons/thumb/7/71/Colors_Cineplex_Black.png/250px-Colors_Cineplex_Black.png",Colors Cineplex
+https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/gb/YuppTV/ColorsCineplexUK.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://i.imgur.com/BEr1r7Lm.png",Dangal 2
+https://live-dangal2.akamaized.net/liveabr/playlist.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://yt3.ggpht.com/JIt8cyzUH7FSN5h7bnVf1eWt27cHL6USpl_lkrjx3d831K_U1YLQWvrTO5zMokSPhU1F-RRStg=s176-c-k-c0x00ffffff-no-rj-mo",Dangal TV
+https://live-dangal.akamaized.net/liveabr/playlist.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://desichannel.in/wp-content/uploads/2025/01/desi-channel.png",Desi Channel
+https://desichannel.kableone.com/desichannel/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://yt3.googleusercontent.com/ytc/AIdro_kR8MAIu23nwXwzXbx8P2Xm1PGcN22jaqb-96zunWyz3wE=s176-c-k-c0x00ffffff-no-rj-mo",E 24
+https://fta.ektv.in/live/159/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://yt3.googleusercontent.com/_X6U6bMLF-pTu5wBMFwsSI6aubGrXk2B0kUKdGiLIMqFLyDIne4Ot4ro76BS1S8fX3pWcCwS=s900-c-k-c0x00ffffff-no-rj",Goldmines Action
+https://fta.ektv.in/live/584/master.m3u8
+#EXTINF:-1 group-title="Kids" tvg-country="IN" tvg-language="hin" tvg-logo="https://i.ibb.co/TDPsPVkT/Greengoldtv.png",Green Gold TV
+https://cc-szrmqvu8zkg16.akamaized.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-szrmqvu8zkg16/greengold/stream/grngld/playlist.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://media.thegtcnetwork.com/uploads/gtc-pujabin-s.jpg",GTC Punjabi UK
+https://neotv.ottlive.co.in/gtcpunjabiuk/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://media.thegtcnetwork.com/uploads/gtc-pujabin-s.jpg",GTC Punjabi US
+https://neotv.ottlive.co.in/gtcpunjabiusa/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://i.ibb.co/SwWjbPSv/hindi-hits-hd.png",Hindi Hits SD
+http://146.59.253.52:8080/hindihitshd/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://dtil.tmsimg.com/assets/s143259_ld_h15_aa.png?lock=720x540",Kaumudy TV
+https://oqgdrkxby4rm-hls-live.5centscdn.com/kaumudytv/live.stream/playlist.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://thumb.wikimedia.org/wikipedia/commons/thumb/2/29/Logo_maha_movie_channel.png/250px-Logo_maha_movie_channel.png",Maha Movie
+https://fta.ektv.in/live/48/48_0.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://i.imgur.com/neZm4CY.png",Mango (India)
+https://stmv6.voxtvhd.com.br/cinehindi/cinehindi/playlist.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="asset:logo_manoranjan_tv",Manoranjan TV
+https://cdn.pishow.tv/ott/live/1013/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://i.imgur.com/lxgXHx4.png",Mastiii
+https://mumbai-edge.smartplaytv.in/MastiMusic/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://dtil.tmsimg.com/assets/s143539_ld_h15_aa.png?lock=720x540",Mh 1 Music
+https://livestream.jswk.online/playlisttest/live/playlist.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://mhone.in/wp-content/uploads/2026/02/cropped-logo_6657fd2fafbc20-72263395-270x270.png",Mh 1 Prime
+https://mumt04.tangotv.in/m18aqlK4MHONE/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://dilse.mhone.in/wp-content/uploads/2022/02/MH-ONE-dil-se-LOGO-white-copy.png",MH One Dil Se
+https://fta.ektv.in/live/351/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://mhone.in/wp-content/uploads/2026/02/cropped-logo_6657fd2fafbc20-72263395-270x270.png",MH One Movies
+https://fta.ektv.in/live/639/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://papaji.freetvindia.com/media/900_FreeTV_Movie_punjab.png",Movie Punjab
+https://mumt01.tangotv.in/O5aw8Zn3MOVIEPUNJAB/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://dtil.tmsimg.com/assets/s143563_ld_h15_aa.png?lock=720x540",Music India
+https://fta.ektv.in/live/158/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://i.ibb.co/yF9MPTDK/blyflx.png",NH BollyFlix
+https://cc-r5hupcym5oehh.akamaized.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-r5hupcym5oehh/SBUM/RunnTV/BollyFlix_IN/BollyFlix_IN.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://papaji.freetvindia.com/media/pankh.png",Pankh
+https://samitaorigin.tangotv.in/PANKH/SAMITAORIGIN/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b1/PITAARA_TV.png/250px-PITAARA_TV.png",Pitaara
+https://d2lk5u59tns74c.cloudfront.net/out/v1/500a6b45f5ae41dda445d912b59eaa09/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://yt3.ggpht.com/DlxtJyXj-OyWQqb4MuPucrw-_eMMoK3hdp-wf3xOtTlApknz3qJFcw55vkvWT4SlmHfK2iPZ9Q=s176-c-k-c0x00ffffff-no-rj-mo",Pitaara Comedy
+https://janya-pitaaralive.akamaized.net/ptnr-monitoring/v1/vglive-sk-217489/live/PitaaraComedy_15/chunks.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://yt3.googleusercontent.com/ytc/AIdro_nPL7k0zC3Hmz102mNHsnUBzuWJQeXqY_fWYuHTwbaJSg=s176-c-k-c0x00ffffff-no-rj-mo",PTC Music
+https://d2lk5u59tns74c.cloudfront.net/out/v1/f913cf893c594f73b114216e74a2efbc/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://yt3.googleusercontent.com/ytc/AIdro_mXYtHNExVbEBuB6GvL9InwBw2X_pvRkMfA4ZTmD-Em41s=s176-c-k-c0x00ffffff-no-rj-mo",PTC Punjabi Gold
+https://d3qs3d2rkhfqrt.cloudfront.net/out/v1/6e14bac6d0384e129521a4d005188bfb/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://yt3.ggpht.com/QYhmeJP0VUr89cJIv1zt2JOAqvPjQhjiNc3bK1JU4iZ5pmjtAz3h8XhAviUTTJbzgcof5eGz=s176-c-k-c0x00ffffff-no-rj-mo",PTC Punjabi HD
+https://d3qs3d2rkhfqrt.cloudfront.net/out/v1/3e22a9c278db4e3eb779afd42e41b0a6/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://yt3.ggpht.com/tApcMQhz4f_mThRYa7Y-iRMR8QtcReYiw60J4OSaHhbuHRu4ibGpM4TLT-VfTP1VxbnCbaOZ=s176-c-k-c0x00ffffff-no-rj-mo",Punjab Plus
+https://punjabplustv.akamaized.net/punjabplustv/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://i.imgur.com/1Za9gNQm.jpg",Punjabi Beats HD
+https://mumt01.tangotv.in/O5aw8Zn3STVHARYANANEWS/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://dtil.tmsimg.com/assets/s143691_ld_h15_aa.png?lock=720x540",Punjabi Hits
+https://legitpro.co.in/punjabihits/punjabihits/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://papaji.freetvindia.com/media/Punjabi_Music_HD.png",Punjabi Music HD
+https://samitaorigin.tangotv.in/PUNJABIMUSICHD/SAMITAORIGIN/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://papaji.freetvindia.com/media/PunjabiTV.png",Punjabi TV
+https://mumt07.tangotv.in/zHjX9OFlPUNJABITV/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://yt3.ggpht.com/QzJdB8gcglxmcmDer3WqYKhJUfeS09c4BdSnHov-xkWf1CkyPJVrsSRqEE9-rhIyYIS1ESLk=s176-c-k-c0x00ffffff-no-rj-mo",Raftaar Media
+https://fta.ektv.in/live/306/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://i.ibb.co/cXPzpGp/SADA-CHANNEL-HBN-global-Punjabi-Satellite-TV.png",SADA TV
+http://cdn12.henico.net:8080/live/sadatv/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://dtil.tmsimg.com/assets/GNLZZGG00297P3E.png?lock=720x540",Shemaroo Josh
+https://cdn.pishow.tv/ott/live/337/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://yt3.ggpht.com/_p2sX2INbbeadOWC91LSLiQvYhNXQnr9CAOh-7grK6qSgE459s2AHxCWifKCEtRLfdqZ_NYM=s176-c-k-c0x00ffffff-no-rj-mo",Taaza TV
+https://live.we2live.in/taazatv/live/playlist.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://yt3.ggpht.com/YLsUXo4wNwd61KSDmrbv4xX9ZliTwiRDhwragvHlh58dImyWvLmRCdB2dgv3eG_zQPgi-rcMyQw=s176-c-k-c0x00ffffff-no-rj-mo",Tabbar Hits
+https://livingindiaottlive.akamaized.net/tabbarhits/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://i.imgur.com/PCVOdup.png",Tehzeeb TV
+https://cdn.pishow.tv/ott/live/239/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://tvpnlogopus.samsungcloud.tv/platform/image/sourcelogo/vc/00/02/34/IN38000072R_20260325T012318SQUARE.png",The Movie Club
+https://mumbai-edge.smartplaytv.in/TheMovieClub/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="pan" tvg-logo="https://yt3.googleusercontent.com/ytc/AIdro_mxkbKeoew-KUGeJ3ADpHrqAzGirHgm-5GT0FAMzv5pYQ=s176-c-k-c0x00ffffff-no-rj-mo",Wah Punjabi
+https://yuppnimrestreammum.akamaized.net/181224/smil:wahpunjabi.smil/playlist.m3u8?hdnts=st=1735898689~exp=1835898688~acl=*~hmac=f5fe24724fe05481e3841f9eb5ab8efdee0a3dd83645ae9dcf45703f525bab7b
+#EXTINF:-1 group-title="Kids" tvg-country="IN" tvg-language="hin" tvg-logo="https://d229kpbsb5jevy.cloudfront.net/yupptvnew/content/common/channel/logos/mjvezt.png",WOW Kidz
+https://yuppparoriglin.akamaized.net/181224/smil:wowkidzhindi.smil/playlist.m3u8?hdnts=st=1735898689~exp=1835898688~acl=*~hmac=f5fe24724fe05481e3841f9eb5ab8efdee0a3dd83645ae9dcf45703f525bab7b
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://thumb.wikimedia.org/wikipedia/commons/thumb/a/af/Zee_Cinema_logo.png/250px-Zee_Cinema_logo.png",Zee Cinema APAC
+https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/sg/YuppTV/ZeeCinemaAPAC.m3u8
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://d229kpbsb5jevy.cloudfront.net/yupptvnew/content/common/logos/channel/logos/zingabad.png",Zingabad
+https://stream.ottlive.co.in/zingabad/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="CA" tvg-language="hin" tvg-logo="https://i.imgur.com/IM4D8Wz.png",Apna Punjab TV
+https://plus.gigabitcdn.net/live-stream/apna-punjab-H3sE/playlist.m3u8
+#EXTINF:-1 group-title="General" tvg-country="CA" tvg-language="pan" tvg-logo="https://i.imgur.com/ArRZRM3.png",Gaunda Punjab TV
+http://cdn6.live247stream.com/gaundapunjab/tv/playlist.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://yt3.googleusercontent.com/inqG4jvFhbFI9jB8IBzmCmct8fcsfeKFwMGAqg-TIi7Ogid0DC-IgM4o6p9ZUW3zhd7AsQ6AomU=s176-c-k-c0x00ffffff-no-rj",ARUJ TV
+http://103.86.132.58:9981/stream/channelid/1391980280
+#EXTINF:-1 group-title="General" tvg-country="MY" tvg-language="pan" tvg-logo="https://i.imgur.com/V2jREQ5.png",Okey
+https://d25tgymtnqzu8s.cloudfront.net/smil:okey/playlist.m3u8?id=3
+#EXTINF:-1 group-title="General" tvg-country="CA" tvg-language="pan" tvg-logo="https://upload.wikimedia.org/wikipedia/en/8/88/PTC_Punjabi.png",PTC Punjabi Canada
+https://stream.ottlive.co.in/ptccanada/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/IJH47fJ.png",Discover Pakistan
+http://116.90.120.149:8000/play/a0s8/index.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/KHuKQQL.png",JooMusic
+https://livecdn.live247stream.com/joomusic/tv/playlist.m3u8
+#EXTINF:-1 group-title="Islamic" tvg-country="PK" tvg-language="urd" tvg-logo="https://raw.githubusercontent.com/fawazahmed0/tiger/master/peace/urdu.jpg",Peace TV Urdu
+https://dzkyvlfyge.erbvr.com/PeaceTvUrdu/index.m3u8
+#EXTINF:-1 group-title="News" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/eqKrL9S.png",92 News
+https://www.youtube.com/@92NewsHDtv/live
+#EXTINF:-1 group-title="News" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/U5BdY2g.png",City 41
+https://www.youtube.com/@City41/live
+#EXTINF:-1 group-title="Sports" tvg-country="IN" tvg-language="hin" tvg-logo="https://dtil.tmsimg.com/assets/GNLZZGG0025TCMR.png?lock=720x540",Sony Sports Ten 3 Hindi
+https://r2.amml.in/sony-ten-3-hd/live.m3u8
+#EXTINF:-1 group-title="Sports" tvg-country="IN" tvg-language="tel" tvg-logo="https://i.imgur.com/m7DvvqF.png",Star Sports 2 Telugu HD
+https://real-vk.proxy.nellaiiptv.com/SDMEDIA/index.m3u8
+#EXTINF:-1 group-title="News" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.ytimg.com/vi/KNvaWHgOBMw/hqdefault.jpg",Express News
+https://www.youtube.com/@ExpressNewspkofficial/live
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://yt3.googleusercontent.com/Q8R6iHca0aGyrT71lYW15XBEKo3xeOTmxnaXXHbAmBLg83PFLITs-5k_sT-Jb4uwguVZm3D7o4c=s176-c-k-c0x00ffffff-no-rj",ARY Zindagi
+http://103.86.132.58:9981/stream/channelid/2101709770
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://yt3.googleusercontent.com/ytc/AIdro_lt2jwFpTYjusceAsLlIE0B312SEUb4A4Du-rbN8n_STCg=s176-c-k-c0x00ffffff-no-rj",Geo Kahani
+http://175.107.244.52:4456/play/a06i
+#EXTINF:-1 group-title="News" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/9OroocT.png",Hum News HD
+https://live.msnetworks.net/hum-news/master.m3u8
+#EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://upload.wikimedia.org/wikipedia/en/b/bb/ARY_Musik_logo.png",ARY Musik
+http://103.86.132.58:9981/stream/channelid/1567867194
+#EXTINF:-1 group-title="Sports" tvg-country="PK" tvg-language="urd" tvg-logo="https://yt3.googleusercontent.com/ytc/AIdro_ljxQ7hfzXg6V-r-CXDCQKc0cWL-aI5yQmtVRq5yEVtWw=s176-c-k-c0x00ffffff-no-rj",A Sports HD
+https://live.msnetworks.net/a-sports/master.m3u8
+#EXTINF:-1 group-title="Drama" tvg-country="PK" tvg-language="urd" tvg-logo="https://yt3.googleusercontent.com/gmRmvRYUHVbi2YnWiM_RbJtwPMkKK_WJfsWYINioLLVutKiQ5_Yf1xbGY57qGJydAY7zNuRp6Q=s176-c-k-c0x00ffffff-no-rj",Geo Entertainment
+http://175.107.244.52:4456/play/a06h/index.m3u8
+#EXTINF:-1 group-title="Drama" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/WK5Cqap.png",Aaj Entertainment
+http://175.107.244.52:4456/play/a02z
+#EXTINF:-1 group-title="Music" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/HWb5Iat.png",Jalwa TV
+http://116.90.120.149:8000/play/a0tv/index.m3u8
+#EXTINF:-1 group-title="Sports" tvg-country="PK" tvg-language="urd" tvg-logo="https://yt3.googleusercontent.com/5E03PY5Ltzf4abr_x9izaRPtNJFhRlLkZadeFP7OzqrGLY8UTDjSkqGH14n52bQROQmidKBhpiE=s176-c-k-c0x00ffffff-no-rj",Geo Super
+http://175.107.244.52:4456/play/a06z
+#EXTINF:-1 group-title="Sports" tvg-country="PK" tvg-language="eng" tvg-logo="https://i.imgur.com/CPm6GHA.png",PTV Sports HD
+https://live.msnetworks.net/ptv-sports/master.m3u8
+#EXTINF:-1 group-title="Sports" tvg-country="PK" tvg-language="eng" tvg-logo="https://i.imgur.com/7qS6TcE.png",Ten Sports Pakistan
+https://live.msnetworks.net/ten-sports/master.m3u8
+#EXTINF:-1 group-title="Sports" tvg-country="PK" tvg-language="urd" tvg-logo="https://msports.pk/wp-content/uploads/2026/02/m-sports-300.png",M Sports
+https://cdn.rabta.stream/M-Sports/index.m3u8
+#EXTINF:-1 group-title="Sports" tvg-country="US" tvg-language="eng" tvg-logo="https://img.willow.tv/apps/willowsports/willowsports-hrb.jpg",Willow TV
+https://d36r8jifhgsk5j.cloudfront.net/Willow_TV.m3u8
+#EXTINF:-1 group-title="Sports" tvg-country="AU" tvg-language="eng" tvg-logo="https://resources.cricket-australia.pulselive.com/cricket-australia/photo/2025/07/25/836eddae-4329-4542-ad17-dcd37e9d951a/Cricket-Gold-1920x1080_noBG.png",Cricket Gold
+https://d382r3rgbxdixq.cloudfront.net/scheduler/scheduleMaster/418.m3u8
