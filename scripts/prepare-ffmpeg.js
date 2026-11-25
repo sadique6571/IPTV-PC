@@ -66,6 +66,26 @@ function findInDir(dir, name) {
   return null;
 }
 
+// Extract a zip with a platform-native tool. The JS extract-zip library
+// is NOT used: it failed on Windows CI (runs #5/#6) with
+// "Unknown encoding: 512" while extracting this exact zip, even though
+// the same code extracted the same bytes fine on Linux.
+function extractZip(zipPath, extractDir) {
+  const { execFileSync } = require('child_process');
+  if (process.platform === 'win32') {
+    // PowerShell is built into Windows; Expand-Archive handles this zip.
+    execFileSync('powershell', ['-NoProfile', '-Command',
+      `Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${extractDir}' -Force`],
+      { stdio: 'inherit' });
+  } else {
+    try {
+      execFileSync('unzip', ['-o', '-q', zipPath, '-d', extractDir], { stdio: 'inherit' });
+    } catch (err) {
+      throw new Error('unzip failed — is the `unzip` command installed? (' + (err.message || err) + ')');
+    }
+  }
+}
+
 // Download the gyan.dev essentials zip, extract bin/ffmpeg.exe, return
 // its path. Temp files live in a .ffmpeg-tmp-* dir under the project
 // root (NOT os.tmpdir(): /tmp is a small tmpfs on some machines and the
@@ -78,8 +98,7 @@ async function downloadWindowsFfmpeg() {
   console.log('Windows ffmpeg: downloading', GYAN_ESSENTIALS_URL);
   await downloadFile(GYAN_ESSENTIALS_URL, zipPath);
   console.log('Windows ffmpeg: downloaded', fs.statSync(zipPath).size, 'bytes; extracting…');
-  const extract = require('extract-zip');
-  await extract(zipPath, { dir: extractDir });
+  extractZip(zipPath, extractDir);
   const exe = findInDir(extractDir, 'ffmpeg.exe');
   if (!exe) throw new Error('ffmpeg.exe not found inside the downloaded essentials zip');
   return { exe, tmpDir };
@@ -96,10 +115,22 @@ async function main() {
     let src = vendorBin;
     let tmpDir = null;
     if (!fs.existsSync(src)) {
-      console.log('Windows ffmpeg: no local vendor/ffmpeg-win/ffmpeg.exe, downloading…');
-      const downloaded = await downloadWindowsFfmpeg();
-      src = downloaded.exe;
-      tmpDir = downloaded.tmpDir;
+      if (process.platform === 'win32') {
+        // Running on Windows (this is the CI case): `npm ci` already
+        // installed the Windows binary via ffmpeg-static — use it
+        // directly. No download, no extraction, no zip library involved,
+        // so the extract-zip failure from runs #5/#6 cannot recur here.
+        src = require('ffmpeg-static');
+        if (!src || !fs.existsSync(src)) {
+          throw new Error('ffmpeg-static Windows binary missing — did `npm ci` run? (looked for ffmpeg.exe in node_modules/ffmpeg-static)');
+        }
+        console.log('Windows ffmpeg: using ffmpeg-static binary', src);
+      } else {
+        console.log('Windows ffmpeg: no local vendor/ffmpeg-win/ffmpeg.exe, downloading…');
+        const downloaded = await downloadWindowsFfmpeg();
+        src = downloaded.exe;
+        tmpDir = downloaded.tmpDir;
+      }
     }
     try {
       const dest = path.join(outDir, 'ffmpeg.exe');
