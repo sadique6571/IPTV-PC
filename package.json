@@ -11,6 +11,7 @@
       "package.json"
     ],
     "linux": {
+      "icon": "assets/icon.png",
       "target": [
         "dir"
       ]
@@ -20,6 +21,7 @@
     },
     "productName": "IPTV Desktop",
     "win": {
+      "icon": "assets/icon.ico",
       "target": [
         "portable",
         "dir"
@@ -45,5 +47,5 @@
     "build:win-dir": "electron-builder --win dir",
     "start": "electron ."
   },
-  "version": "1.0.0"
+  "version": "1.0.2"
 }

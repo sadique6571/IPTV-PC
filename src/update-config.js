@@ -7,8 +7,8 @@
 
 module.exports = {
   // GitHub repo that publishes the desktop releases.
-  // Created by the user 2026-11-25 (verified: exists, currently empty).
-  // Nothing has been pushed to it yet — push needs the user's word.
+  // Created by the user 2026-11-25; v1.0.0.1 released the same day.
+  // The updater checks this repo's latest release.
   OWNER: 'sadique6571',
   REPO: 'IPTV-PC',
 
@@ -23,7 +23,7 @@ module.exports = {
   //   v<versionName>.<versionCode>, e.g. v1.0.0.1
   // The versionCode is the LAST dot segment; it must increase for every
   // build users should be offered. Bump BUILD_CODE below on each release.
-  BUILD_CODE: 1,
+  BUILD_CODE: 3,
 
   // Silent check at most once a day (same as Android: 24h).
   CHECK_INTERVAL_MS: 24 * 60 * 60 * 1000,

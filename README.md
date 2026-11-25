@@ -81,6 +81,27 @@ no telemetry, no auto-updater, no accounts.
 
 ## Verified (2026-11-25, first build)
 
+- **v1.0.2 (2026-11-25)**: HLS recovery — fatal MEDIA_ERROR calls
+  `recoverMediaError()`, fatal NETWORK_ERROR retries (startLoad, then
+  full re-attach, max 3) with raised retry budgets (frag/manifest/level
+  ×6); counter resets on FRAG_BUFFERED/playing. Hide-the-list toggle
+  (header button + player-side button + `L` key, persisted). Player bar
+  is now a frosted-glass pill (60% black + 25% white rim, Android
+  demo chrome). MPEG-2 channels (Geo Super) show an honest message +
+  "VLC mein kholo" instead of a black screen. Version 1.0.2,
+  BUILD_CODE 3 (tag v1.0.2.3). Verified 2026-11-25: drag test drove a
+  real +150px pointer drag (list 565→715px, splitWidth 715 persisted;
+  `L` hides the list, restore button brings back 715px); PTV Home HLS
+  plays (readyState 4, 23.5s, 854×480); Geo Super shows the MPEG-2
+  message + button (videoWidth 0, 8.4s in); exe icon extracted from
+  both exes = the IPTV artwork (pefile: 6 RT_ICON entries each).
+- **v1.0.1 (2026-11-25)**: Android launcher icon everywhere — the
+  `iptv_icon.xml` artwork (navy `#080F1E` + mint `#48F6BD`) converted to
+  `assets/icon.png` (512×512) and `assets/icon.ico` (256/128/64/48/32/16),
+  wired into the window, the header, and the Windows exe / Linux build.
+  Draggable divider between the list and the player (min 280px list /
+  320px player, split persists in state). Version 1.0.1, BUILD_CODE 2
+  (tag v1.0.1.2).
 - `npm install` clean (284 packages) + `npm run build:win` exit 0:
   `dist/IPTV-Desktop-portable.exe` — 113,078,418 bytes (~108 MB),
   PE32 NSIS self-extracting archive; `dist/win-unpacked/IPTV Desktop.exe`

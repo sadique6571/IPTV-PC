@@ -131,23 +131,97 @@ function toggleFav(ch) {
 }
 
 // ---------- player ----------
+// HLS retry budget (module-level so a pending re-attach can be cancelled
+// when the user switches channel). Android parity: the Android player
+// recovers from transient fragment failures instead of dying on the
+// first one. The counter resets for a new source and whenever playback
+// is healthy again (FRAG_BUFFERED / playing), so a later hiccup gets a
+// fresh set of retries — and it can never loop forever: at most 3
+// recovery attempts per outage, then the error is shown.
+let hlsRetries = 0;
+let hlsRetryTimer = null;
+let hlsRetryUrl = null;
+let currentStreamUrl = '';
+let mpegtsNoFrameTimer = null;
+
+function hideCodecMsg() { $('codecMsg').classList.add('hidden'); }
+function showCodecMsg() { $('codecMsg').classList.remove('hidden'); }
+function openInExternalPlayer() {
+  if (!currentStreamUrl) return;
+  window.api.openExternal(currentStreamUrl);
+  toast('External player mein khul raha hai…');
+}
+
 function attachSource(url) {
   if (hls) { hls.destroy(); hls = null; }
   if (mpegtsPlayer) { try { mpegtsPlayer.destroy(); } catch (_) {} mpegtsPlayer = null; }
+  if (hlsRetryTimer) { clearTimeout(hlsRetryTimer); hlsRetryTimer = null; }
+  if (mpegtsNoFrameTimer) { clearTimeout(mpegtsNoFrameTimer); mpegtsNoFrameTimer = null; }
+  // New source (different URL) gets a fresh retry budget; a re-attach of
+  // the same URL keeps the counter so retries stay bounded.
+  if (url !== hlsRetryUrl) hlsRetries = 0;
+  hlsRetryUrl = null;
+  currentStreamUrl = url;
+  hideCodecMsg();
   video.removeAttribute('src');
   video.load();
   const isHls = /\.m3u8(\?|$)/i.test(url);
   const isMp4 = /\.(mp4|webm|mov|mkv)(\?|$)/i.test(url);
   if (isHls && window.Hls && Hls.isSupported()) {
-    hls = new Hls({ maxBufferLength: 30 });
+    // Raised retry budgets (hls.js defaults are 1-2): short-segment live
+    // streams (Willow TV, Cricket Gold — 6-7s segments, SCTE-35 markers)
+    // hit live-edge races that a single failed fragment must not kill.
+    hls = new Hls({
+      maxBufferLength: 30,
+      fragLoadingMaxRetry: 6,
+      manifestLoadingMaxRetry: 6,
+      levelLoadingMaxRetry: 6,
+    });
+    hlsRetryUrl = url;
     hls.loadSource(url);
     hls.attachMedia(video);
+    // A fragment buffered = playback is healthy again: fresh retries.
+    hls.on(Hls.Events.FRAG_BUFFERED, () => { hlsRetries = 0; });
     hls.on(Hls.Events.ERROR, (_e, data) => {
       window.__lastHlsError = data;
-      if (data.fatal) {
-        console.error('hls fatal', data);
-        toast('Stream error: ' + (data.details || 'playback failed'));
+      if (!data.fatal) return;
+      console.error('hls fatal', data);
+      if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+        // Corrupt frame / codec glitch — recover in place, no reload.
+        if (hlsRetries < 3) {
+          hlsRetries += 1;
+          try { hls.recoverMediaError(); } catch (_) {}
+          toast('Dobara koshish ho rahi hai…');
+        } else {
+          toast('Stream error: ' + (data.details || 'playback failed'));
+        }
+        return;
       }
+      if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+        // fragLoadError / levelLoadError / manifestLoadError: retry.
+        if (hlsRetries < 3) {
+          hlsRetries += 1;
+          toast('Dobara koshish ho rahi hai…');
+          if (hlsRetries === 1) {
+            // First retry: resume loading on the same instance.
+            try { hls.startLoad(); } catch (_) {}
+          } else {
+            // Same error again: full re-attach after a short delay.
+            // Guarded by hlsRetryUrl so a channel switch cancels it.
+            if (hlsRetryTimer) clearTimeout(hlsRetryTimer);
+            hlsRetryTimer = setTimeout(() => {
+              hlsRetryTimer = null;
+              if (hls && hlsRetryUrl === url) attachSource(url);
+            }, 1500);
+          }
+          return;
+        }
+        // Retries exhausted — only now show the dead error.
+        toast('Stream error: ' + (data.details || 'playback failed'));
+        return;
+      }
+      // Other fatal types (KEY_SYSTEM_ERROR etc.): nothing safe to retry.
+      toast('Stream error: ' + (data.details || 'playback failed'));
     });
   } else if (isMp4) {
     video.src = url;
@@ -158,8 +232,27 @@ function attachSource(url) {
     try {
       mpegtsPlayer = mpegts.createPlayer({ type: 'mpegts', isLive: true, url });
       mpegtsPlayer.attachMediaElement(video);
+      // MPEG-2 video (Geo Super: mpeg2video 720x576) cannot be decoded by
+      // Chromium's MSE at all — no in-browser fix. Detect it from the
+      // media-info codec (never a hardcoded channel name) and say so
+      // instead of a silent black screen.
+      mpegtsPlayer.on(mpegts.Events.MEDIA_INFO, (info) => {
+        const codec = String((info && info.videoCodec) || '').toLowerCase();
+        if (info && info.hasVideo && codec && !codec.includes('avc')) {
+          showCodecMsg();
+        }
+      });
       mpegtsPlayer.load();
       mpegtsPlayer.play().catch(() => {});
+      // Safety net: no video frames within ~8s (a codec the browser
+      // can't decode, or a demuxer that never reports a track) — same
+      // message instead of a black screen.
+      mpegtsNoFrameTimer = setTimeout(() => {
+        mpegtsNoFrameTimer = null;
+        if (mpegtsPlayer && currentStreamUrl === url && video.videoWidth === 0) {
+          showCodecMsg();
+        }
+      }, 8000);
     } catch (e) {
       console.warn('mpegts failed, falling back to native:', e);
       video.src = url;
@@ -269,6 +362,12 @@ video.addEventListener('ended', () => {
   }
   updateUpNext();
 });
+// Playback actually running = healthy again: fresh HLS retry budget.
+// And if real frames exist, any codec warning was a false alarm.
+video.addEventListener('playing', () => {
+  hlsRetries = 0;
+  if (video.videoWidth > 0) hideCodecMsg();
+});
 video.addEventListener('click', playPause);
 $('btnPlay').onclick = playPause;
 $('btnBack10').onclick = () => seekBy(-10);
@@ -286,8 +385,25 @@ $('btnCC').onclick = () => toggleCC();
 $('btnQuality').onclick = () => showQualityMenu();
 $('btnPrev').onclick = () => stepEpisode(-1);
 $('btnNext').onclick = () => stepEpisode(1);
+$('btnOpenExternal').onclick = openInExternalPlayer;
 // No volume slider in the player bar (Android parity) — volume is on
 // the keyboard: + / - adjust, M mutes.
+
+// ---------- hide-the-list toggle (v1.0.2) ----------
+// Hides the list panel + divider so the player goes full-width; the
+// previous split returns when shown again. Persisted in state.listHidden.
+function setListHidden(hidden, save) {
+  $('split').classList.toggle('list-hidden', hidden);
+  $('showListBtn').classList.toggle('hidden', !hidden);
+  $('toggleList').textContent = hidden ? '☰ List dikhao' : '☰ List chhupao';
+  state.listHidden = hidden;
+  if (hidden === false && typeof state.splitWidth === 'number') {
+    applySplitWidth(state.splitWidth, false);
+  }
+  if (save) saveStateSoon();
+}
+$('toggleList').onclick = () => setListHidden(!state.listHidden, true);
+$('showListBtn').onclick = () => setListHidden(false, true);
 
 // ---------- popups ----------
 function closePopup() { $('popupMenu').classList.add('hidden'); }
@@ -640,6 +756,7 @@ document.addEventListener('keydown', (e) => {
     case '+': case '=': video.volume = Math.min(1, video.volume + 0.1); video.muted = false; toast('Volume: ' + Math.round(video.volume * 100) + '%'); break;
     case '-': case '_': video.volume = Math.max(0, video.volume - 0.1); toast('Volume: ' + Math.round(video.volume * 100) + '%'); break;
     case 'm': case 'M': video.muted = !video.muted; toast(video.muted ? 'Muted' : 'Sound on'); break;
+    case 'l': case 'L': setListHidden(!state.listHidden, true); break;
   }
 });
 document.addEventListener('click', (e) => {
@@ -717,6 +834,72 @@ $('checkUpdate').onclick = async () => {
   }
 };
 
+// ---------- draggable divider: list vs player (v1.0.1) ----------
+// The left pane width (px) is persisted in state.splitWidth and restored
+// on next launch. List min 280px, player min 320px — neither pane can
+// collapse to nothing. Mouse drag + keyboard (Left/Right arrows,
+// Shift = bigger step) both work; other keys and focus are untouched.
+const SPLIT_MIN_LEFT = 280;
+const SPLIT_MIN_RIGHT = 320;
+const SPLIT_STEP = 20;
+function splitMaxLeft() {
+  const split = $('split');
+  if (!split) return 800;
+  // #split horizontal padding is 12px each side; the splitter is 14px.
+  return Math.max(SPLIT_MIN_LEFT, split.clientWidth - 24 - 14 - SPLIT_MIN_RIGHT);
+}
+function applySplitWidth(px, save) {
+  const w = Math.round(Math.min(Math.max(px, SPLIT_MIN_LEFT), splitMaxLeft()));
+  $('leftPane').style.flex = `0 0 ${w}px`;
+  state.splitWidth = w;
+  if (save) saveStateSoon();
+  return w;
+}
+function initSplitter() {
+  const splitter = $('splitter');
+  const left = $('leftPane');
+  if (!splitter || !left) return;
+  // Restore the saved split (default is the 45% from CSS).
+  if (typeof state.splitWidth === 'number' && state.splitWidth > 0) {
+    applySplitWidth(state.splitWidth, false);
+  }
+  let dragging = false, dragStartX = 0, dragStartW = 0;
+  splitter.addEventListener('pointerdown', (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    dragging = true;
+    dragStartX = e.clientX;
+    dragStartW = left.getBoundingClientRect().width;
+    try { splitter.setPointerCapture(e.pointerId); } catch (_) { /* pointer capture is best-effort */ }
+    splitter.classList.add('dragging');
+    document.body.classList.add('split-dragging');
+    e.preventDefault();
+  });
+  splitter.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    applySplitWidth(dragStartW + (e.clientX - dragStartX), false);
+  });
+  const endDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    splitter.classList.remove('dragging');
+    document.body.classList.remove('split-dragging');
+    saveStateSoon();
+  };
+  splitter.addEventListener('pointerup', endDrag);
+  splitter.addEventListener('pointercancel', endDrag);
+  // Keyboard: arrows resize the split; Shift = 100px step.
+  splitter.addEventListener('keydown', (e) => {
+    const step = e.shiftKey ? 100 : SPLIT_STEP;
+    const cur = left.getBoundingClientRect().width;
+    if (e.key === 'ArrowLeft') { applySplitWidth(cur - step, true); e.preventDefault(); }
+    else if (e.key === 'ArrowRight') { applySplitWidth(cur + step, true); e.preventDefault(); }
+  });
+  // Keep the saved split inside the window when it is resized.
+  window.addEventListener('resize', () => {
+    if (typeof state.splitWidth === 'number') applySplitWidth(state.splitWidth, false);
+  });
+}
+
 // ---------- boot ----------
 (async function boot() {
   tickClock();
@@ -724,6 +907,8 @@ $('checkUpdate').onclick = async () => {
   const ver = await window.api.installedVersion();
   $('version').textContent = ver.label;
   state = Object.assign(state, await window.api.loadState());
+  initSplitter();
+  if (state.listHidden) setListHidden(true, false);
   await loadChannels();
   if (state.lastTab === 'movies') switchTab('movies');
   // Auto-play first channel so the TV opens onto something playing.

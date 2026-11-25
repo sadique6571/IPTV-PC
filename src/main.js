@@ -48,6 +48,9 @@ function createWindow() {
     minHeight: 540,
     backgroundColor: '#0b0e14',
     title: 'IPTV Desktop',
+    // Same artwork as the Android launcher icon (assets/icon.png,
+    // converted from iptv_icon.xml) — window + taskbar icon.
+    icon: path.join(__dirname, '..', 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

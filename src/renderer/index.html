@@ -9,12 +9,13 @@
 <body>
 <div id="app">
   <header id="topbar">
-    <div class="brand"><span class="brand-tv">▣</span> IPTV <span id="version" class="version"></span></div>
+    <div class="brand"><img class="brand-icon" src="../../assets/icon.png" alt="IPTV"> IPTV <span id="version" class="version"></span></div>
     <nav id="tabs" role="tablist">
       <button class="tab active" data-tab="tv" role="tab">Live TV</button>
       <button class="tab" data-tab="movies" role="tab">Movies &amp; Series</button>
     </nav>
     <div class="top-right">
+      <button id="toggleList" class="pill" title="List chhupao / dikhao (L)">☰ List chhupao</button>
       <button id="openM3U" class="pill" title="Load a playlist file (.m3u)">Open M3U</button>
       <button id="checkUpdate" class="pill" title="Check for updates">⬆ Check for updates</button>
       <span id="clock" class="clock"></span>
@@ -53,12 +54,21 @@
       <div id="statusBar" class="status">Loading channels…</div>
     </section>
 
+    <!-- Draggable divider: list vs player (v1.0.1) -->
+    <div id="splitter" role="separator" aria-orientation="vertical" aria-label="List aur player ka size badlein" tabindex="0" title="Drag karein — list / player size"><div class="split-grip"></div></div>
+
     <!-- RIGHT: player -->
     <section id="rightPane">
       <div id="playerWrap">
         <video id="video" playsinline></video>
         <div id="nowPlaying" class="now-playing hidden"></div>
         <div id="bigPlay" class="big-play hidden">▶</div>
+        <button id="showListBtn" class="show-list hidden" title="List dikhao (L)">☰ List dikhao</button>
+        <div id="codecMsg" class="codec-msg hidden">
+          <div class="codec-title">Ye channel MPEG-2 video hai</div>
+          <div class="codec-text">Browser player mein iski picture nahi chal sakti — isko external player (jaise VLC) mein kholein.</div>
+          <button id="btnOpenExternal" class="btn primary">VLC mein kholo</button>
+        </div>
         <div id="playerBar">
           <button id="btnPlay" class="disc" title="Play / Pause (Space)">▶</button>
           <button id="btnBack10" class="chip-btn" title="Back 10s (←)">−10</button>
