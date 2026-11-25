@@ -101,7 +101,7 @@ https://oqgdrkxby4rm-hls-live.5centscdn.com/kaumudytv/live.stream/playlist.m3u8
 https://fta.ektv.in/live/48/48_0.m3u8
 #EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://i.imgur.com/neZm4CY.png",Mango (India)
 https://stmv6.voxtvhd.com.br/cinehindi/cinehindi/playlist.m3u8
-#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="asset:logo_manoranjan_tv",Manoranjan TV
+#EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/india/manoranjan-in.png",Manoranjan TV
 https://cdn.pishow.tv/ott/live/1013/master.m3u8
 #EXTINF:-1 group-title="General" tvg-country="IN" tvg-language="hin" tvg-logo="https://i.imgur.com/lxgXHx4.png",Mastiii
 https://mumbai-edge.smartplaytv.in/MastiMusic/index.m3u8
@@ -197,7 +197,7 @@ http://175.107.244.52:4456/play/a06i
 https://live.msnetworks.net/hum-news/master.m3u8
 #EXTINF:-1 group-title="General" tvg-country="PK" tvg-language="urd" tvg-logo="https://upload.wikimedia.org/wikipedia/en/b/bb/ARY_Musik_logo.png",ARY Musik
 http://103.86.132.58:9981/stream/channelid/1567867194
-#EXTINF:-1 group-title="Sports" tvg-country="PK" tvg-language="urd" tvg-logo="https://yt3.googleusercontent.com/ytc/AIdro_ljxQ7hfzXg6V-r-CXDCQKc0cWL-aI5yQmtVRq5yEVtWw=s176-c-k-c0x00ffffff-no-rj",A Sports HD
+#EXTINF:-1 group-title="Sports" tvg-country="PK" tvg-language="urd" tvg-logo="https://upload.wikimedia.org/wikipedia/en/0/0c/A_Sports_Logo.png",A Sports HD
 https://live.msnetworks.net/a-sports/master.m3u8
 #EXTINF:-1 group-title="Drama" tvg-country="PK" tvg-language="urd" tvg-logo="https://yt3.googleusercontent.com/gmRmvRYUHVbi2YnWiM_RbJtwPMkKK_WJfsWYINioLLVutKiQ5_Yf1xbGY57qGJydAY7zNuRp6Q=s176-c-k-c0x00ffffff-no-rj",Geo Entertainment
 http://175.107.244.52:4456/play/a06h/index.m3u8
@@ -209,11 +209,11 @@ http://116.90.120.149:8000/play/a0tv/index.m3u8
 http://175.107.244.52:4456/play/a06z
 #EXTINF:-1 group-title="Sports" tvg-country="PK" tvg-language="eng" tvg-logo="https://i.imgur.com/CPm6GHA.png",PTV Sports HD
 https://live.msnetworks.net/ptv-sports/master.m3u8
-#EXTINF:-1 group-title="Sports" tvg-country="PK" tvg-language="eng" tvg-logo="https://i.imgur.com/7qS6TcE.png",Ten Sports Pakistan
+#EXTINF:-1 group-title="Sports" tvg-country="PK" tvg-language="eng" tvg-logo="assets/logos/ten-sports.png",Ten Sports Pakistan
 https://live.msnetworks.net/ten-sports/master.m3u8
 #EXTINF:-1 group-title="Sports" tvg-country="PK" tvg-language="urd" tvg-logo="https://msports.pk/wp-content/uploads/2026/02/m-sports-300.png",M Sports
 https://cdn.rabta.stream/M-Sports/index.m3u8
-#EXTINF:-1 group-title="Sports" tvg-country="US" tvg-language="eng" tvg-logo="https://img.willow.tv/apps/willowsports/willowsports-hrb.jpg",Willow TV
+#EXTINF:-1 group-title="Sports" tvg-country="US" tvg-language="eng" tvg-logo="assets/logos/willow.jpg",Willow TV
 https://d36r8jifhgsk5j.cloudfront.net/Willow_TV.m3u8
 #EXTINF:-1 group-title="Sports" tvg-country="AU" tvg-language="eng" tvg-logo="https://resources.cricket-australia.pulselive.com/cricket-australia/photo/2025/07/25/836eddae-4329-4542-ad17-dcd37e9d951a/Cricket-Gold-1920x1080_noBG.png",Cricket Gold
 https://d382r3rgbxdixq.cloudfront.net/scheduler/scheduleMaster/418.m3u8

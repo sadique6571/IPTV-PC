@@ -1,3 +1,6 @@
 node_modules/
 dist/
+ffmpeg-bin/
+.ffmpeg-tmp-*/
 *.log
+vendor/

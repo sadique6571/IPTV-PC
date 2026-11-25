@@ -81,6 +81,27 @@ no telemetry, no auto-updater, no accounts.
 
 ## Verified (2026-11-25, first build)
 
+- **v1.0.3 (2026-11-25)**: ffmpeg transcode for MPEG-2 — Geo Super
+  plays in-app (transcoded to H.264 + AAC HLS on localhost; falls back
+  to the VLC message if ffmpeg fails; PTV Home still plays direct, no
+  ffmpeg spawned). TV Quality menu — Auto + per-level rows with bitrate,
+  switchable. Channel arrange — drag-and-drop, Shift+Arrow keys, Arrange
+  menu (Pakistani pehle / A–Z / Default), order persists. YouTube live
+  channels (92 News, City 41, Express News) now play in-app via embed
+  (actual video playback not proven in this sandbox — Error 153 even for
+  a known-embeddable test video). Uniform 44×44 logo tiles; Ten Sports
+  and Willow tight crops bundled in `assets/logos/`. Size — locales
+  stripped to en-US only + NSIS maximum compression; exe is still bigger
+  than v1.0.2 (137 MB vs 108 MB) because ffmpeg.exe adds 82.8 MB. Menu
+  bar removed; custom title bar — frameless window, header is the drag
+  region, minimise/maximise/close buttons in app style. Version 1.0.3,
+  BUILD_CODE 4 (tag v1.0.3.4). Verified 2026-11-25 under Xvfb: Geo Super
+  transcode plays (768×576, currentTime advancing); 12/12 arrange checks
+  pass; title-bar minimise/maximise/close verified under openbox. The
+  Windows ffmpeg binary is downloaded at build time from gyan.dev
+  (`scripts/prepare-ffmpeg.js`, vendor copy preferred when present) —
+  CI needs no local copy. Windows-only behaviour (ffmpeg.exe playback,
+  YouTube video, window drag/snap) cannot be proven from the Linux VM.
 - **v1.0.2 (2026-11-25)**: HLS recovery — fatal MEDIA_ERROR calls
   `recoverMediaError()`, fatal NETWORK_ERROR retries (startLoad, then
   full re-attach, max 3) with raised retry budgets (frag/manifest/level
@@ -136,8 +157,9 @@ no telemetry, no auto-updater, no accounts.
   manifest (decoded from `signCookie`); the desktop player has no DASH
   support yet. Titles that only offer DASH show "No playable streams".
   (The detector/H5 paths cover most titles.)
-- **3 YouTube live channels** (92 News, City 41, Express News) open in
-  the system browser instead of playing in-app.
+- **3 YouTube live channels** (92 News, City 41, Express News) now play
+  in-app via embed (v1.0.3); actual video playback was not provable in
+  this sandbox (Error 153 even for a known-embeddable test video).
 - **Trending rail** can come back empty when the trending endpoint is
   slow; the other rails still load.
 - **No Xtream support yet** (the Android app has it; desktop v1 has

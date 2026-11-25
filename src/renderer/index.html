@@ -19,6 +19,11 @@
       <button id="openM3U" class="pill" title="Load a playlist file (.m3u)">Open M3U</button>
       <button id="checkUpdate" class="pill" title="Check for updates">⬆ Check for updates</button>
       <span id="clock" class="clock"></span>
+      <div class="win-controls" role="group" aria-label="Window controls">
+        <button id="winMin" class="win-btn" title="Minimise">—</button>
+        <button id="winMax" class="win-btn" title="Maximise">▢</button>
+        <button id="winClose" class="win-btn close" title="Close">✕</button>
+      </div>
     </div>
   </header>
 
@@ -29,7 +34,9 @@
       <div id="tvView" class="view">
         <div class="search-row">
           <input id="tvSearch" type="text" placeholder="Search channels…" autocomplete="off">
+          <button id="arrangeBtn" class="pill" title="Channel order badlein — drag, Shift+↑/↓, ya sort">⇅ Arrange</button>
         </div>
+        <div id="arrangeMenu" class="popup arrange hidden"></div>
         <div id="catChips" class="chips"></div>
         <div id="catalogTitle" class="catalog-title"></div>
         <div id="channelList" class="list" tabindex="0"></div>
@@ -61,6 +68,8 @@
     <section id="rightPane">
       <div id="playerWrap">
         <video id="video" playsinline></video>
+        <iframe id="ytFrame" class="yt-frame hidden" title="YouTube live" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        <button id="ytOpenBrowser" class="yt-browser-btn hidden" title="Agar YouTube embed na chale to browser mein kholein">↗ Browser mein kholein</button>
         <div id="nowPlaying" class="now-playing hidden"></div>
         <div id="bigPlay" class="big-play hidden">▶</div>
         <button id="showListBtn" class="show-list hidden" title="List dikhao (L)">☰ List dikhao</button>

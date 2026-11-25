@@ -23,7 +23,7 @@ module.exports = {
   //   v<versionName>.<versionCode>, e.g. v1.0.0.1
   // The versionCode is the LAST dot segment; it must increase for every
   // build users should be offered. Bump BUILD_CODE below on each release.
-  BUILD_CODE: 3,
+  BUILD_CODE: 4,
 
   // Silent check at most once a day (same as Android: 24h).
   CHECK_INTERVAL_MS: 24 * 60 * 60 * 1000,

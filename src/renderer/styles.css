@@ -35,14 +35,17 @@ body {
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
-#app { display: flex; flex-direction: column; height: 100vh; }
+#app { display: flex; flex-direction: column; height: 100vh; box-sizing: border-box;
+  /* Frameless window (v1.0.3): thin app-style border so the window edge
+     stays visible against dark backgrounds. */
+  border: 1px solid rgba(150,172,255,0.28); }
 .hidden { display: none !important; }
 button { font-family: inherit; color: var(--text); cursor: pointer; }
 button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
   outline: 2px solid var(--focus); outline-offset: 1px;
 }
 
-/* ---- header ---- */
+/* ---- header — also the custom title bar (frameless window, v1.0.3) ---- */
 #topbar {
   display: flex; align-items: center; gap: 16px;
   height: 56px; padding: 0 16px; flex: 0 0 56px;
@@ -51,7 +54,21 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
   border: 1px solid var(--glass-border-hi);
   border-radius: 20px;
   margin: 10px 12px 8px;
+  /* The header is the drag region of the frameless window. */
+  -webkit-app-region: drag;
 }
+/* Interactive elements inside the drag region must stay clickable. */
+#topbar button, #topbar input { -webkit-app-region: no-drag; }
+/* Custom window controls (app style, not native grey). */
+.win-controls { display: flex; align-items: center; gap: 4px; margin-left: 4px; }
+.win-btn {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+  color: var(--text); font-size: 14px; line-height: 1;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.win-btn:hover { background: rgba(255,255,255,0.16); }
+.win-btn.close:hover { background: #e81123; border-color: #e81123; color: #fff; }
 .brand { font-size: 28px; font-weight: 700; letter-spacing: 0.03em; }
 .brand-tv { color: var(--accent); }
 .version { font-size: 12px; color: var(--muted2); font-weight: 400; margin-left: 6px; }
@@ -96,9 +113,9 @@ body.split-dragging, body.split-dragging * { cursor: col-resize !important; }
 .view { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
 /* ---- search + chips ---- */
-.search-row { padding: 12px 12px 8px; }
+.search-row { padding: 12px 12px 8px; display: flex; gap: 8px; }
 .search-row input {
-  width: 100%; padding: 10px 12px; font-size: 15px; color: var(--text);
+  flex: 1; min-width: 0; padding: 10px 12px; font-size: 15px; color: var(--text);
   background: var(--panel2); border: 1px solid var(--glass-border); border-radius: 8px;
 }
 .search-row input::placeholder { color: var(--muted); }
@@ -123,10 +140,21 @@ body.split-dragging, body.split-dragging * { cursor: col-resize !important; }
 }
 .row:hover { background: linear-gradient(180deg, rgba(58,90,128,0.7), rgba(34,53,78,0.7)); }
 .row.selected, .row.focused { border: 2px solid var(--accent); background: linear-gradient(180deg, rgba(58,90,128,0.75), rgba(34,53,78,0.75)); }
-.row .logo { width: 44px; height: 28px; object-fit: contain; border-radius: 4px; background: #000; flex: 0 0 44px; }
+/* Drag-and-drop reorder: the dragged row goes faint, the drop target
+   shows a bright line above or below it. */
+.row.dragging { opacity: 0.45; }
+.row.drop-before { box-shadow: 0 -3px 0 0 var(--accent); }
+.row.drop-after { box-shadow: 0 3px 0 0 var(--accent); }
+/* Uniform logo tile (v1.0.3): every channel logo gets the same square
+   tile — object-fit: contain + even padding + one neutral dark
+   background — so square avatars, wide banners and 4:3 logos all align
+   and none renders as a tiny strip or a black box. Logos are tight
+   crops (see assets/channels.m3u notes); a missing/broken logo falls
+   back to the letter tile, never an empty box. */
+.row .logo { width: 44px; height: 44px; object-fit: contain; padding: 3px; box-sizing: border-box; border-radius: 6px; background: #23262e; flex: 0 0 44px; }
 .row .logo-fallback {
-  width: 44px; height: 28px; flex: 0 0 44px; border-radius: 4px; background: var(--panel2);
-  display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--muted);
+  width: 44px; height: 44px; flex: 0 0 44px; border-radius: 6px; background: var(--panel2);
+  display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; color: var(--muted);
 }
 .row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 700; }
 .row .meta { color: var(--muted2); font-size: 12px; }
@@ -179,6 +207,16 @@ body.split-dragging, body.split-dragging * { cursor: col-resize !important; }
 
 /* ---- player ---- */
 #playerWrap { position: relative; flex: 1; min-height: 0; background: var(--screen); display: flex; border-radius: 24px; overflow: hidden; border: 1px solid rgba(150, 172, 255, 0.4); }
+/* YouTube live embed (v1.0.3): fills the player area; the app's own
+   player bar is hidden while it shows — YouTube has its own controls. */
+.yt-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; z-index: 5; }
+/* Escape hatch while a YouTube embed shows: opens the channel in the
+   system browser if the embed itself fails (e.g. a YouTube error). */
+.yt-browser-btn { position: absolute; right: 12px; bottom: 12px; z-index: 6; padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.35); background: rgba(0,0,0,0.65); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+.yt-browser-btn:hover { background: rgba(0,0,0,0.85); }
+#playerWrap.yt-mode #video { display: none; }
+#playerWrap.yt-mode #playerBar, #playerWrap.yt-mode #bigPlay { display: none; }
+#playerWrap.yt-mode .now-playing { z-index: 6; }
 #video { width: 100%; height: 100%; object-fit: contain; background: var(--screen); }
 /* List hidden (v1.0.2): the list panel and the divider go away together,
    the player takes the full width; the split returns when shown again. */
@@ -249,6 +287,10 @@ body.split-dragging, body.split-dragging * { cursor: col-resize !important; }
 }
 .popup .p-item:hover, .popup .p-item.focused { background: rgba(255,255,255,0.12); }
 .popup .p-item .tick { margin-left: auto; color: #fff; }
+/* Arrange menu: same popup shell, but anchored under the search row in
+   the TV list pane instead of above the player bar. */
+#tvView { position: relative; }
+.popup.arrange { top: 56px; left: 12px; right: auto; bottom: auto; }
 .toast {
   position: absolute; bottom: 64px; left: 50%; transform: translateX(-50%);
   background: rgba(0,0,0,0.85); border: 1px solid var(--glass-border); border-radius: 8px;

@@ -10,6 +10,12 @@
       "assets/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "ffmpeg-bin",
+        "to": "ffmpeg-bin"
+      }
+    ],
     "linux": {
       "icon": "assets/icon.png",
       "target": [
@@ -26,26 +32,30 @@
         "portable",
         "dir"
       ]
-    }
+    },
+    "compression": "maximum",
+    "afterPack": "scripts/after-pack.js"
   },
   "dependencies": {
+    "ffmpeg-static": "^5.3.0",
     "hls.js": "1.7.4",
     "mpegts.js": "1.8.2"
   },
   "description": "IPTV Desktop — Live TV, movies and series on Windows (Linux later), same TV style as the Android app.",
   "devDependencies": {
     "electron": "45.5.0",
-    "electron-builder": "26.18.0"
+    "electron-builder": "26.18.0",
+    "extract-zip": "^2.0.1"
   },
   "license": "UNLICENSED",
   "main": "src/main.js",
   "name": "iptv-desktop",
   "private": true,
   "scripts": {
-    "build:linux": "electron-builder --linux dir",
-    "build:win": "electron-builder --win portable dir",
-    "build:win-dir": "electron-builder --win dir",
+    "build:linux": "node scripts/prepare-ffmpeg.js linux && electron-builder --linux dir",
+    "build:win": "node scripts/prepare-ffmpeg.js win && electron-builder --win portable dir",
+    "build:win-dir": "node scripts/prepare-ffmpeg.js win && electron-builder --win dir",
     "start": "electron ."
   },
-  "version": "1.0.2"
+  "version": "1.0.3"
 }

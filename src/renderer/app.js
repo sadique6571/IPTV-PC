@@ -7,9 +7,11 @@ const $ = (id) => document.getElementById(id);
 const video = $('video');
 const toastEl = $('toast');
 
-let state = { favorites: [], continueWatching: {}, customPlaylist: null, lastTab: 'tv' };
+let state = { favorites: [], continueWatching: {}, customPlaylist: null, lastTab: 'tv', channelOrder: null };
 let channels = [];
+let defaultChannels = []; // M3U/file order — never reordered; "Default order" restores this
 let filtered = [];
+let dragUrl = null; // URL of the row being dragged (null when not dragging)
 let activeCategory = 'All';
 let focusIndex = -1;
 let hls = null;
@@ -57,8 +59,85 @@ async function loadChannels() {
       $('statusBar').textContent = `${channels.length} channels loaded`;
     }
   }
+  defaultChannels = channels.slice();
+  channels = applySavedOrder(channels);
   buildCategoryChips();
   applyChannelFilter();
+}
+
+// ---------- channel order (v1.0.3) ----------
+// The user's channel order lives in state.channelOrder (array of URLs,
+// saved in state.json). The M3U is only the source of channels: saved
+// order wins, channels missing from it (new in the list) go at the end
+// in their original relative order, stale URLs are dropped.
+function applySavedOrder(list) {
+  const order = state.channelOrder;
+  if (!Array.isArray(order) || !order.length) return list.slice();
+  const byUrl = new Map(list.map((c) => [c.url, c]));
+  const out = [];
+  for (const url of order) {
+    const ch = byUrl.get(url);
+    if (ch) { out.push(ch); byUrl.delete(url); }
+  }
+  for (const c of list) if (byUrl.has(c.url)) out.push(c);
+  return out;
+}
+function saveChannelOrder() {
+  state.channelOrder = channels.map((c) => c.url);
+  saveStateSoon();
+}
+// Move a channel inside the FULL channels list (not the filtered view).
+function moveChannel(fromIdx, toIdx) {
+  if (fromIdx < 0 || fromIdx >= channels.length) return null;
+  toIdx = Math.max(0, Math.min(channels.length - 1, toIdx));
+  if (fromIdx === toIdx) return channels[fromIdx];
+  const [ch] = channels.splice(fromIdx, 1);
+  channels.splice(toIdx, 0, ch);
+  saveChannelOrder();
+  return ch;
+}
+// Move the focused row one step (keyboard/remote: Shift+ArrowUp/Down,
+// or the Arrange menu). The move applies to the FULL channel list, but
+// it jumps past the next/previous VISIBLE row — so under a category or
+// search filter one press always visibly moves the row one step (moving
+// to the adjacent full-list slot could swap with a hidden channel and
+// look like nothing happened).
+function moveFocusedChannel(delta) {
+  if (document.querySelector('.tab.active').dataset.tab !== 'tv') return;
+  if (focusIndex < 0 || !filtered[focusIndex]) { toast('Pehle koi channel select karein'); return; }
+  const ch = filtered[focusIndex];
+  const neighbour = delta > 0 ? filtered[focusIndex + 1] : filtered[focusIndex - 1];
+  if (!neighbour) { toast(delta > 0 ? 'Ye pehle se sab se neeche hai' : 'Ye pehle se sab se upar hai'); return; }
+  // moveChannel(from, to) splices the channel out and inserts at `to`:
+  // moving down, inserting at the neighbour's index lands after it
+  // (it shifted down by one on removal); moving up, it lands before it.
+  const moved = moveChannel(channels.indexOf(ch), channels.indexOf(neighbour));
+  if (!moved) return;
+  applyChannelFilter(moved.url);
+  toast(`${moved.name} ${delta < 0 ? 'upar' : 'neeche'} move ho gaya`);
+}
+function applyArrange(act) {
+  if (act === 'pk') {
+    // Stable sort: PK first, then IN, then the rest — the original
+    // relative order inside each group is kept (Array.sort is stable).
+    const rank = (c) => (c.country === 'PK' ? 0 : c.country === 'IN' ? 1 : 2);
+    channels.sort((a, b) => rank(a) - rank(b));
+    saveChannelOrder();
+    applyChannelFilter();
+    toast('Pakistani channels pehle');
+  } else if (act === 'az') {
+    channels.sort((a, b) => a.name.localeCompare(b.name));
+    saveChannelOrder();
+    applyChannelFilter();
+    toast('A–Z order');
+  } else if (act === 'def') {
+    state.channelOrder = null;
+    channels = defaultChannels.slice();
+    applyChannelFilter();
+    saveStateSoon();
+    toast('Default order (M3U)');
+  } else if (act === 'up') moveFocusedChannel(-1);
+  else if (act === 'down') moveFocusedChannel(1);
 }
 
 // Android maps Drama + Music into General (no own category) — same here.
@@ -81,7 +160,7 @@ function buildCategoryChips() {
   }
 }
 function isFav(ch) { return state.favorites.includes(ch.url); }
-function applyChannelFilter() {
+function applyChannelFilter(keepFocusUrl) {
   const q = $('tvSearch').value.trim().toLowerCase();
   filtered = channels.filter((c) => {
     if (activeCategory === '★ Favorites') { if (!isFav(c)) return false; }
@@ -89,7 +168,11 @@ function applyChannelFilter() {
     if (q && !c.name.toLowerCase().includes(q)) return false;
     return true;
   });
-  focusIndex = filtered.length ? 0 : -1;
+  // After a manual move/sort, keep the focus on the moved channel
+  // instead of jumping back to the top of the list.
+  focusIndex = keepFocusUrl
+    ? Math.max(0, filtered.findIndex((c) => c.url === keepFocusUrl))
+    : (filtered.length ? 0 : -1);
   const src = state.customPlaylist ? state.customPlaylist.path.split(/[\\/]/).pop() : 'Checked streams';
   $('catalogTitle').textContent = `${src} · ${filtered.length}${q ? ` · "${$('tvSearch').value.trim()}"` : ''}`;
   renderChannelList();
@@ -116,6 +199,53 @@ function renderChannelList() {
       renderChannelList();
       playChannel(ch);
     };
+    // Drag-and-drop reorder (mouse): drag a row onto another row to
+    // move it there; the drop position (before/after) follows the
+    // mouse's half of the target row. The move applies to the FULL
+    // channel list, so it works under a category/search filter too.
+    row.draggable = true;
+    row.addEventListener('dragstart', (e) => {
+      dragUrl = ch.url;
+      e.dataTransfer.setData('text/plain', ch.url);
+      e.dataTransfer.effectAllowed = 'move';
+      row.classList.add('dragging');
+    });
+    row.addEventListener('dragend', () => {
+      dragUrl = null;
+      list.querySelectorAll('.row').forEach((r) => r.classList.remove('dragging', 'drop-before', 'drop-after'));
+    });
+    // dragenter MUST be cancelled for the row to become a drop target
+    // at all — without this, dragover never fires on other rows and
+    // the drop event never happens (verified with a CDP drag probe).
+    row.addEventListener('dragenter', (e) => {
+      if (!dragUrl || dragUrl === ch.url) return;
+      e.preventDefault();
+    });
+    row.addEventListener('dragover', (e) => {
+      if (!dragUrl || dragUrl === ch.url) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const rect = row.getBoundingClientRect();
+      const before = (e.clientY - rect.top) < rect.height / 2;
+      row.classList.toggle('drop-before', before);
+      row.classList.toggle('drop-after', !before);
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('drop-before', 'drop-after'));
+    row.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (!dragUrl || dragUrl === ch.url) return;
+      const dragged = channels.find((c) => c.url === dragUrl);
+      if (!dragged) return;
+      const rect = row.getBoundingClientRect();
+      const before = (e.clientY - rect.top) < rect.height / 2;
+      const from = channels.indexOf(dragged);
+      let to = channels.indexOf(ch);
+      if (!before) to += 1;
+      if (from < to) to -= 1;
+      moveChannel(from, to);
+      applyChannelFilter(dragged.url);
+      toast(`${dragged.name} move ho gaya`);
+    });
     list.appendChild(row);
   });
   if (!filtered.length) {
@@ -143,6 +273,16 @@ let hlsRetryTimer = null;
 let hlsRetryUrl = null;
 let currentStreamUrl = '';
 let mpegtsNoFrameTimer = null;
+// MPEG-2 transcode state (v1.0.3): when a raw TS stream's video codec
+// is not H.264, the main process re-encodes it to H.264/AAC HLS on
+// localhost and the playlist below is what actually gets attached.
+// transcodeOriginalUrl stays the real stream URL (the VLC button opens
+// that, never the localhost playlist). transcodeAttemptedFor stops a
+// failed transcode from retrying in a loop for the same playback.
+let transcodePlaylistUrl = '';
+let transcodeOriginalUrl = '';
+let transcodeAttemptedFor = '';
+let transcodeWatchdog = null;
 
 function hideCodecMsg() { $('codecMsg').classList.add('hidden'); }
 function showCodecMsg() { $('codecMsg').classList.remove('hidden'); }
@@ -153,15 +293,30 @@ function openInExternalPlayer() {
 }
 
 function attachSource(url) {
+  hideYouTubeEmbed();
   if (hls) { hls.destroy(); hls = null; }
   if (mpegtsPlayer) { try { mpegtsPlayer.destroy(); } catch (_) {} mpegtsPlayer = null; }
   if (hlsRetryTimer) { clearTimeout(hlsRetryTimer); hlsRetryTimer = null; }
   if (mpegtsNoFrameTimer) { clearTimeout(mpegtsNoFrameTimer); mpegtsNoFrameTimer = null; }
+  if (transcodeWatchdog) { clearTimeout(transcodeWatchdog); transcodeWatchdog = null; }
+  // A re-attach of our own transcode playlist (hls.js retry) keeps the
+  // transcode alive; ANY other source stops it — ffmpeg must never
+  // keep running after a channel change.
+  const isTranscodePlaylist = !!transcodePlaylistUrl && url === transcodePlaylistUrl;
+  if (isTranscodePlaylist) {
+    currentStreamUrl = transcodeOriginalUrl;
+    window.__transcode = { active: true, original: transcodeOriginalUrl, playlist: transcodePlaylistUrl };
+  } else {
+    if (transcodePlaylistUrl) { window.api.stopTranscode().catch(() => {}); }
+    transcodePlaylistUrl = '';
+    transcodeOriginalUrl = '';
+    window.__transcode = null;
+    currentStreamUrl = url;
+  }
   // New source (different URL) gets a fresh retry budget; a re-attach of
   // the same URL keeps the counter so retries stay bounded.
   if (url !== hlsRetryUrl) hlsRetries = 0;
   hlsRetryUrl = null;
-  currentStreamUrl = url;
   hideCodecMsg();
   video.removeAttribute('src');
   video.load();
@@ -232,25 +387,27 @@ function attachSource(url) {
     try {
       mpegtsPlayer = mpegts.createPlayer({ type: 'mpegts', isLive: true, url });
       mpegtsPlayer.attachMediaElement(video);
-      // MPEG-2 video (Geo Super: mpeg2video 720x576) cannot be decoded by
-      // Chromium's MSE at all — no in-browser fix. Detect it from the
-      // media-info codec (never a hardcoded channel name) and say so
-      // instead of a silent black screen.
+      // MPEG-2 video (Geo Super: mpeg2video 720x576 interlaced) cannot
+      // be decoded by Chromium's MSE at all. Detect it from the
+      // media-info codec (never a hardcoded channel name) and transcode
+      // it in the main process (ffmpeg -> H.264/AAC HLS on localhost)
+      // instead of a silent black screen; the VLC message is only the
+      // fallback if the transcode fails.
       mpegtsPlayer.on(mpegts.Events.MEDIA_INFO, (info) => {
         const codec = String((info && info.videoCodec) || '').toLowerCase();
         if (info && info.hasVideo && codec && !codec.includes('avc')) {
-          showCodecMsg();
+          handleUnplayableTs(url);
         }
       });
       mpegtsPlayer.load();
       mpegtsPlayer.play().catch(() => {});
       // Safety net: no video frames within ~8s (a codec the browser
       // can't decode, or a demuxer that never reports a track) — same
-      // message instead of a black screen.
+      // transcode attempt, then the VLC message if that fails too.
       mpegtsNoFrameTimer = setTimeout(() => {
         mpegtsNoFrameTimer = null;
         if (mpegtsPlayer && currentStreamUrl === url && video.videoWidth === 0) {
-          showCodecMsg();
+          handleUnplayableTs(url);
         }
       }, 8000);
     } catch (e) {
@@ -261,8 +418,54 @@ function attachSource(url) {
     video.src = url;
   }
 }
+// A raw TS stream the browser can't decode (MPEG-2 video): transcode it
+// in the main process and play the localhost HLS playlist. If the
+// transcode fails — or still shows no frames 10s after attaching — fall
+// back to the honest message + VLC button, never a silent black screen.
+async function handleUnplayableTs(url) {
+  if (transcodeAttemptedFor === url) { showCodecMsg(); return; }
+  transcodeAttemptedFor = url;
+  toast('MPEG-2 hai — app mein chalane ke liye convert ho raha hai…');
+  $('statusBar').textContent = 'MPEG-2 convert ho raha hai…';
+  let res;
+  try {
+    res = await window.api.startTranscode(url);
+  } catch (e) {
+    res = { ok: false, error: String(e) };
+  }
+  // The user moved on while ffmpeg was starting — don't hijack the new
+  // source; stop the transcode that is no longer needed.
+  if (currentStreamUrl !== url || transcodeAttemptedFor !== url) {
+    if (res && res.ok) window.api.stopTranscode().catch(() => {});
+    return;
+  }
+  if (!res || !res.ok) {
+    console.warn('transcode failed:', res && res.error);
+    showCodecMsg();
+    toast('Convert nahi ho saka — VLC mein kholein');
+    return;
+  }
+  transcodePlaylistUrl = res.playlistUrl;
+  transcodeOriginalUrl = url;
+  attachSource(res.playlistUrl);
+  video.play().catch(() => {});
+  transcodeWatchdog = setTimeout(() => {
+    transcodeWatchdog = null;
+    if (video.videoWidth === 0) {
+      window.api.stopTranscode().catch(() => {});
+      transcodePlaylistUrl = '';
+      transcodeOriginalUrl = '';
+      window.__transcode = null;
+      showCodecMsg();
+      toast('Convert nahi ho saka — VLC mein kholein');
+    }
+  }, 10000);
+}
 function playSource(url, opts) {
   opts = opts || {};
+  // A fresh explicit play gets a fresh transcode attempt (a transient
+  // ffmpeg failure must not stay sticky for the channel).
+  transcodeAttemptedFor = '';
   currentSources = opts.sources || [{ label: 'Auto', url }];
   current = Object.assign({ kind: 'tv' }, opts.meta || {});
   attachSource(url);
@@ -285,12 +488,12 @@ function playSource(url, opts) {
   updateUpNext();
 }
 function playChannel(ch) {
-  // YouTube live pages (3 channels) are not media streams — the Android
-  // app plays them via a WebView; here they open in the system browser.
+  // YouTube live channels (92 News, City 41, Express News) are not
+  // media streams — they play inside the app via a YouTube embed
+  // (v1.0.3); the system browser only opens if the embed cannot be
+  // built at all (see playYouTubeChannel).
   if (/youtube\.com/i.test(ch.url)) {
-    window.api.openExternal(ch.url);
-    toast('YouTube live — browser mein khul raha hai: ' + ch.name);
-    $('statusBar').textContent = 'YouTube live (browser): ' + ch.name;
+    playYouTubeChannel(ch);
     return;
   }
   const idx = channels.indexOf(ch);
@@ -303,7 +506,86 @@ function playChannel(ch) {
   });
   $('statusBar').textContent = 'Playing: ' + ch.name;
 }
+// ---------- YouTube live in-app (v1.0.3) ----------
+// Channel IDs are stable (unlike live video IDs, which change on every
+// stream restart), so they are the fallback anchor. Resolved once from
+// each channel's public page; the live VIDEO id is resolved fresh at
+// play time (see src/youtube.js).
+const YT_CHANNEL_IDS = {
+  '92newshdtv': 'UCk7Kj4QiPYN4vbe5yT8femw',
+  'city41': 'UCcmpeVbSSQlZRvHfdC-CRwg',
+  'expressnewspkofficial': 'UCF-uOc4AYA9uyH7ZFUTZEIg',
+};
+let ytActive = false;
+function showYouTubeEmbed(embedUrl, ch) {
+  const frame = $('ytFrame');
+  frame.src = embedUrl;
+  frame.classList.remove('hidden');
+  $('playerWrap').classList.add('yt-mode');
+  $('ytOpenBrowser').classList.remove('hidden');
+  ytActive = true;
+  current = { kind: 'tv', channel: ch, channelIndex: channels.indexOf(ch) };
+  currentSources = [];
+  hideCodecMsg();
+  const np = $('nowPlaying');
+  np.textContent = '▶ ' + ch.name + ' (YouTube live)';
+  np.classList.remove('hidden');
+  $('statusBar').textContent = 'Playing: ' + ch.name + ' (YouTube live)';
+  updateUpNext();
+}
+function hideYouTubeEmbed() {
+  if (!ytActive) return;
+  ytActive = false;
+  $('ytOpenBrowser').classList.add('hidden');
+  const frame = $('ytFrame');
+  frame.src = 'about:blank';
+  frame.classList.add('hidden');
+  $('playerWrap').classList.remove('yt-mode');
+}
+async function playYouTubeChannel(ch) {
+  // Stop whatever was playing (normal stream or another embed).
+  if (hls) { hls.destroy(); hls = null; }
+  if (mpegtsPlayer) { try { mpegtsPlayer.destroy(); } catch (_) {} mpegtsPlayer = null; }
+  if (transcodePlaylistUrl) { window.api.stopTranscode().catch(() => {}); transcodePlaylistUrl = ''; transcodeOriginalUrl = ''; }
+  // The old <video> keeps playing (audio!) behind the embed unless stopped.
+  try { video.pause(); } catch (_) {}
+  video.removeAttribute('src');
+  video.load();
+  window.api.setMediaHeaders(null);
+  $('statusBar').textContent = 'YouTube live load ho raha hai: ' + ch.name;
+  const m = ch.url.match(/youtube\.com\/@([^/?#]+)/i);
+  const handle = m ? m[1].toLowerCase() : '';
+  // 1) Resolve the current live video ID from the /live page.
+  let videoId = null;
+  try {
+    const r = await window.api.resolveYouTubeLive(ch.url);
+    if (r && r.videoId) videoId = r.videoId;
+    else console.warn('yt resolve failed:', r && r.error);
+  } catch (e) { console.warn('yt resolve error:', e); }
+  // 2) Fall back to the live_stream embed, which resolves the live
+  // video itself at load time from the (stable) channel ID.
+  let embedUrl = null;
+  // NOTE: youtube.com (not youtube-nocookie.com) — the nocookie host
+  // returns ERR_EMPTY_RESPONSE inside Chromium here, while youtube.com
+  // loads the player; on a normal PC both work, youtube.com is the
+  // safer default. If the embed itself fails on the user's PC (e.g.
+  // YouTube Error 153), the "Browser mein kholein" button in yt-mode
+  // is the escape hatch — never a dead black player.
+  if (videoId) embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+  else if (YT_CHANNEL_IDS[handle]) embedUrl = `https://www.youtube.com/embed/live_stream?channel=${YT_CHANNEL_IDS[handle]}&autoplay=1`;
+  // 3) Nothing worked — the old behaviour (browser), never a dead click.
+  if (!embedUrl) {
+    window.api.openExternal(ch.url);
+    toast('YouTube live — browser mein khul raha hai: ' + ch.name);
+    $('statusBar').textContent = 'YouTube live (browser): ' + ch.name;
+    return;
+  }
+  showYouTubeEmbed(embedUrl, ch);
+}
 function playPause() {
+  // A YouTube embed has its own controls — the app's play/pause must
+  // never touch the (stopped) <video> behind it.
+  if (ytActive) return;
   if (!video.src && !video.currentSrc) return;
   if (video.paused) { video.play(); $('btnPlay').textContent = '❚❚'; $('bigPlay').classList.add('hidden'); }
   else { video.pause(); $('btnPlay').textContent = '▶'; $('bigPlay').classList.remove('hidden'); }
@@ -366,10 +648,22 @@ video.addEventListener('ended', () => {
 // And if real frames exist, any codec warning was a false alarm.
 video.addEventListener('playing', () => {
   hlsRetries = 0;
-  if (video.videoWidth > 0) hideCodecMsg();
+  if (video.videoWidth > 0) {
+    hideCodecMsg();
+    if (transcodeWatchdog) { clearTimeout(transcodeWatchdog); transcodeWatchdog = null; }
+    if (transcodePlaylistUrl && current && current.channel) {
+      $('statusBar').textContent = 'Playing: ' + current.channel.name + ' (MPEG-2 → H.264)';
+    }
+  }
 });
 video.addEventListener('click', playPause);
 $('btnPlay').onclick = playPause;
+// YouTube embed escape hatch (yt-mode only): if the embed shows a black
+// player / YouTube error on the user's PC, one tap opens the channel in
+// the system browser instead — never a dead click.
+$('ytOpenBrowser').onclick = () => {
+  if (current && current.channel && current.channel.url) window.api.openExternal(current.channel.url);
+};
 $('btnBack10').onclick = () => seekBy(-10);
 $('btnFwd10').onclick = () => seekBy(10);
 $('seek').addEventListener('input', (e) => {
@@ -405,10 +699,113 @@ function setListHidden(hidden, save) {
 $('toggleList').onclick = () => setListHidden(!state.listHidden, true);
 $('showListBtn').onclick = () => setListHidden(false, true);
 
+// ---------- custom title bar (frameless window, v1.0.3) ----------
+// Header is the drag region; these buttons are the window controls.
+$('winMin').onclick = () => window.api.minimizeWindow();
+$('winMax').onclick = () => window.api.toggleMaximizeWindow();
+$('winClose').onclick = () => window.api.closeWindow();
+// Maximise/restore icon follows the real window state.
+const setMaxIcon = (maximized) => {
+  $('winMax').textContent = maximized ? '❐' : '▢';
+  $('winMax').title = maximized ? 'Restore' : 'Maximise';
+};
+window.api.onMaximizeChange(setMaxIcon);
+window.api.isMaximized().then(setMaxIcon).catch(() => {});
+// Double-click on the header (not on a button/input) toggles maximise.
+$('topbar').addEventListener('dblclick', (e) => {
+  if (e.target.closest('button, input')) return;
+  window.api.toggleMaximizeWindow();
+});
+
 // ---------- popups ----------
 function closePopup() { $('popupMenu').classList.add('hidden'); }
+function closeArrangeMenu() { $('arrangeMenu').classList.add('hidden'); }
+function showArrangeMenu() {
+  const menu = $('arrangeMenu');
+  const focused = (focusIndex >= 0 && filtered[focusIndex]) ? filtered[focusIndex] : null;
+  const items = [
+    { id: 'pk', label: 'Pakistani pehle' },
+    { id: 'az', label: 'A–Z' },
+    { id: 'def', label: 'Default order' },
+  ];
+  menu.innerHTML = '<div class="p-title">Arrange channels</div>' +
+    items.map((it) => `<button class="p-item" data-act="${it.id}">${esc(it.label)}</button>`).join('') +
+    '<div class="p-title">' + (focused ? esc(focused.name) + ' — move karein' : 'Move: pehle koi channel select karein') + '</div>' +
+    '<button class="p-item" data-act="up">↑ Upar move karein</button>' +
+    '<button class="p-item" data-act="down">↓ Neeche move karein</button>';
+  menu.classList.remove('hidden');
+  menu.querySelectorAll('.p-item').forEach((b) => {
+    b.onclick = () => { applyArrange(b.dataset.act); closeArrangeMenu(); };
+  });
+}
+$('arrangeBtn').onclick = () => {
+  if ($('arrangeMenu').classList.contains('hidden')) showArrangeMenu();
+  else closeArrangeMenu();
+};
+// Live TV quality: the stream's real resolution, plus the HLS
+// variants when the playlist offers more than one level.
+function resolutionLabel(w, h) {
+  if (!w || !h) return '';
+  return h + 'p';
+}
+function tvQualityItems() {
+  const items = [];
+  const isTranscode = !!transcodePlaylistUrl;
+  if (hls && Array.isArray(hls.levels) && hls.levels.length > 1) {
+    const auto = hls.autoLevelEnabled;
+    items.push({ key: 'auto', label: 'Auto', tick: auto });
+    hls.levels.forEach((lv, i) => {
+      const label = resolutionLabel(lv.width, lv.height) +
+        (lv.bitrate ? ` · ${(lv.bitrate / 1e6).toFixed(1)} Mbps` : '');
+      items.push({ key: String(i), label, tick: !auto && hls.nextLevel === i });
+    });
+  } else if (video.videoWidth > 0) {
+    // Single-variant stream (raw MPEG-TS, single-level HLS, or the
+    // ffmpeg transcode output): one honest entry, not fake choices.
+    const label = resolutionLabel(video.videoWidth, video.videoHeight) +
+      (isTranscode ? ' — MPEG-2 → H.264' : ' — live');
+    items.push({ key: 'current', label, tick: true });
+  } else {
+    items.push({ key: 'current', label: isTranscode ? 'MPEG-2 → H.264 — live' : 'Live — Auto', tick: false });
+  }
+  return items;
+}
+function setTvLevel(index) {
+  if (!hls) return;
+  if (index < 0) {
+    hls.nextLevel = -1;
+    window.__qualityLevel = { level: -1, height: null, width: null };
+    toast('Quality: Auto');
+  } else {
+    const lv = hls.levels && hls.levels[index];
+    if (!lv) { toast('Quality option nahi hai'); return; }
+    hls.nextLevel = index;
+    window.__qualityLevel = { level: index, height: lv.height, width: lv.width };
+    toast('Quality: ' + resolutionLabel(lv.width, lv.height));
+  }
+}
 function showQualityMenu() {
   const menu = $('popupMenu');
+  // A YouTube embed has its own quality control (the ⚙ icon in the
+  // YouTube player) — the app's quality list does not apply to it.
+  if (ytActive) { toast('Quality YouTube player mein badlein (⚙ icon)'); return; }
+  // Live TV: real stream quality (resolution + HLS levels) — the movie
+  // path below (currentSources switching) is unchanged.
+  if (current && current.kind === 'tv') {
+    const items = tvQualityItems();
+    menu.innerHTML = '<div class="p-title">Quality</div>' + items.map((it) =>
+      `<button class="p-item" data-key="${esc(it.key)}">${esc(it.label)}<span class="tick">${it.tick ? '✓' : ''}</span></button>`).join('');
+    menu.classList.remove('hidden');
+    menu.querySelectorAll('.p-item').forEach((b) => {
+      b.onclick = () => {
+        const key = b.dataset.key;
+        if (key === 'auto') setTvLevel(-1);
+        else if (key !== 'current') setTvLevel(Number(key));
+        closePopup();
+      };
+    });
+    return;
+  }
   if (!currentSources.length) { toast('No quality options'); return; }
   menu.innerHTML = '<div class="p-title">Quality</div>' + currentSources.map((s) =>
     `<button class="p-item" data-label="${esc(s.label)}">${esc(s.label)}<span class="tick">${video.currentSrc === s.url ? '✓' : ''}</span></button>`).join('');
@@ -418,6 +815,7 @@ function showQualityMenu() {
   });
 }
 function toggleCC() {
+  if (ytActive) { toast('Subtitles YouTube player mein (CC button)'); return; }
   if (!ccTrackUrl) { toast('No English subtitles for this title'); return; }
   ccOn = !ccOn;
   const track = video.querySelector('track');
@@ -730,6 +1128,7 @@ document.addEventListener('keydown', (e) => {
   const inInput = /INPUT|TEXTAREA/.test(document.activeElement.tagName);
   if (e.key === 'Escape') {
     if (!$('popupMenu').classList.contains('hidden')) { closePopup(); return; }
+    if (!$('arrangeMenu').classList.contains('hidden')) { closeArrangeMenu(); return; }
     if (currentDetails) { backToMoviesHome(); return; }
     if (document.fullscreenElement) { document.exitFullscreen(); return; }
     return;
@@ -740,8 +1139,8 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   switch (e.key) {
-    case 'ArrowDown': e.preventDefault(); moveFocus(1); break;
-    case 'ArrowUp': e.preventDefault(); moveFocus(-1); break;
+    case 'ArrowDown': e.preventDefault(); if (e.shiftKey) moveFocusedChannel(1); else moveFocus(1); break;
+    case 'ArrowUp': e.preventDefault(); if (e.shiftKey) moveFocusedChannel(-1); else moveFocus(-1); break;
     case 'ArrowRight': if (document.activeElement === video || document.activeElement === document.body) { seekBy(10); } break;
     case 'ArrowLeft': if (document.activeElement === video || document.activeElement === document.body) { seekBy(-10); } break;
     case 'Enter': {
@@ -761,6 +1160,7 @@ document.addEventListener('keydown', (e) => {
 });
 document.addEventListener('click', (e) => {
   if (!$('popupMenu').classList.contains('hidden') && !$('popupMenu').contains(e.target) && e.target.id !== 'btnQuality') closePopup();
+  if (!$('arrangeMenu').classList.contains('hidden') && !$('arrangeMenu').contains(e.target) && e.target.id !== 'arrangeBtn') closeArrangeMenu();
 });
 
 // ---------- in-app updater (mirrors Android UpdateChecker/UpdateFlow) ----------
@@ -920,4 +1320,9 @@ function initSplitter() {
     first = filtered.find((c) => c.name.toLowerCase().includes(needle)) || first;
   }
   if (first) playChannel(first);
+  // Dev-only screenshot-test hooks: IPTV_OPEN_QUALITY=<ms> opens the
+  // Quality menu after <ms>; IPTV_QUALITY_LEVEL=<n> picks HLS level n
+  // through the same code path as the menu.
+  if (env.openQuality) { const ms = Number(env.openQuality) || 9000; setTimeout(() => showQualityMenu(), ms); }
+  if (env.qualityLevel !== '' && env.qualityLevel != null) { const idx = Number(env.qualityLevel); setTimeout(() => setTvLevel(idx), 12000); }
 })();

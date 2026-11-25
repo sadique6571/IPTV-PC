@@ -5,12 +5,15 @@
 // forbidden headers via fetch).
 'use strict';
 
-const { app, BrowserWindow, ipcMain, dialog, session, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, session, shell, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { pathToFileURL } = require('url');
 
 const moviebox = require('./moviebox');
 const updater = require('./updater');
+const transcode = require('./transcode');
+const youtube = require('./youtube');
 
 let mainWindow = null;
 // Current movie playback's file-request headers (see onBeforeSendHeaders).
@@ -46,6 +49,11 @@ function createWindow() {
     height: 720,
     minWidth: 960,
     minHeight: 540,
+    // Custom title bar (v1.0.3): frameless window — the app's own header
+    // is the title bar (drag region + custom min/max/close buttons).
+    // Native title bar + menu are gone; the window stays resizable.
+    frame: false,
+    resizable: true,
     backgroundColor: '#0b0e14',
     title: 'IPTV Desktop',
     // Same artwork as the Android launcher icon (assets/icon.png,
@@ -66,6 +74,9 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   mainWindow.on('closed', () => { mainWindow = null; });
+  // Custom title bar: keep the maximise/restore button icon in sync.
+  mainWindow.on('maximize', () => { if (mainWindow) mainWindow.webContents.send('window:maximize-changed', true); });
+  mainWindow.on('unmaximize', () => { if (mainWindow) mainWindow.webContents.send('window:maximize-changed', false); });
 
   // Dev-only smoke-test hook: IPTV_SCREENSHOT=/tmp/shot.png captures the
   // window a few seconds after load and quits. Never set in production.
@@ -77,12 +88,17 @@ function createWindow() {
     setTimeout(async () => {
       try {
         const state = await mainWindow.webContents.executeJavaScript(
-          `(() => { const v = document.getElementById('video'); const rows = document.querySelectorAll('#channelList .row').length; const e = window.__lastHlsError; const imgs = [...document.querySelectorAll('.card img, .row .logo')]; const loaded = imgs.filter((i) => i.naturalWidth > 0).length; return { readyState: v.readyState, currentTime: v.currentTime, paused: v.paused, videoWidth: v.videoWidth, videoHeight: v.videoHeight, src: (v.currentSrc || '').slice(0, 80), rows, imgs: imgs.length, imgsLoaded: loaded, status: document.getElementById('statusBar').textContent, hlsError: e ? { type: e.type, details: e.details, fatal: e.fatal, url: (e.context && e.context.url) || '', responseCode: (e.networkDetails && e.networkDetails.status) || (e.response && e.response.code) || '' } : null, hlsLoaded: !!window.Hls, mpegtsLoaded: !!window.mpegts }; })()`,
+          `(() => { const v = document.getElementById('video'); const rows = document.querySelectorAll('#channelList .row').length; const e = window.__lastHlsError; const imgs = [...document.querySelectorAll('.card img, .row .logo')]; const loaded = imgs.filter((i) => i.naturalWidth > 0).length; return { readyState: v.readyState, currentTime: v.currentTime, paused: v.paused, videoWidth: v.videoWidth, videoHeight: v.videoHeight, src: (v.currentSrc || '').slice(0, 80), rows, imgs: imgs.length, imgsLoaded: loaded, status: document.getElementById('statusBar').textContent, qualityLevel: window.__qualityLevel || null, hlsError: e ? { type: e.type, details: e.details, fatal: e.fatal, url: (e.context && e.context.url) || '', responseCode: (e.networkDetails && e.networkDetails.status) || (e.response && e.response.code) || '' } : null, hlsLoaded: !!window.Hls, mpegtsLoaded: !!window.mpegts }; })()`,
         );
         console.log('VIDEO STATE:', JSON.stringify(state));
         const img = await mainWindow.capturePage();
         fs.writeFileSync(out, img.toPNG());
         console.log('screenshot saved:', out);
+        try {
+          console.log('TRANSCODE STATE:', JSON.stringify(await mainWindow.webContents.executeJavaScript(
+            `(() => { const t = window.__transcode || null; return t ? { active: t.active, original: (t.original || '').slice(0, 60), playlist: (t.playlist || '').slice(0, 60) } : null; })()`,
+          )));
+        } catch (_) {}
       } catch (e) {
         console.error('screenshot failed:', e);
       }
@@ -106,6 +122,11 @@ if (process.env.IPTV_PROXY_AUTH) {
 }
 
 app.whenReady().then(() => {
+  // No default Electron menu bar (File/Edit/View/Window) — only the
+  // app's own IPTV header shows. This removes the menu entirely; it is
+  // NOT frame:false (the normal title bar with minimise/maximise/close
+  // stays) and NOT autoHideMenuBar (Alt must not bring it back).
+  Menu.setApplicationMenu(null);
   // Media request headers: the <video> element cannot set Referer/Cookie
   // on file requests, but MovieBox file CDNs need them (H5 streams need
   // the detail-page Referer or the CDN answers 429; play-info streams
@@ -144,6 +165,11 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
+// Never leave a transcode ffmpeg running after the app quits.
+app.on('before-quit', () => {
+  try { transcode.shutdown(); } catch (_) {}
+});
+
 // ---- state / files -------------------------------------------------------
 ipcMain.handle('state:load', () => loadState());
 ipcMain.handle('state:save', (_e, state) => saveState(state));
@@ -153,7 +179,15 @@ ipcMain.handle('app:paths', () => ({
 }));
 ipcMain.handle('channels:bundled', () => {
   try {
-    return fs.readFileSync(path.join(__dirname, '..', 'assets', 'channels.m3u'), 'utf8');
+    const text = fs.readFileSync(path.join(__dirname, '..', 'assets', 'channels.m3u'), 'utf8');
+    // Bundled tight-cropped logos (assets/logos/*) are referenced by
+    // relative path in the M3U — resolve them to file:// URLs here so
+    // the renderer <img> can load them (works in dev and in the
+    // packaged app, where assets ship inside the asar).
+    const base = path.join(__dirname, '..');
+    return text.replace(/tvg-logo="assets\//g, (_m) => {
+      return 'tvg-logo="' + pathToFileURL(path.join(base, 'assets')).href + '/';
+    });
   } catch (e) {
     return { error: String(e) };
   }
@@ -177,6 +211,30 @@ ipcMain.handle('dialog:openM3U', async () => {
     return { error: String(e) };
   }
 });
+
+// ---- MPEG-2 live transcode (Geo Super) -------------------------------
+// The renderer detects an undecodable codec and hands the stream URL
+// here; ffmpeg re-encodes to H.264/AAC HLS on localhost (see
+// transcode.js). Only ever one transcode at a time.
+ipcMain.handle('transcode:start', (_e, url) => transcode.startTranscode(url));
+ipcMain.handle('transcode:stop', () => { transcode.stopTranscode(); return true; });
+ipcMain.handle('transcode:status', () => transcode.status());
+
+// Custom title bar (frameless window, v1.0.3): minimise / maximise / close.
+ipcMain.handle('window:minimize', () => { if (mainWindow) mainWindow.minimize(); return true; });
+ipcMain.handle('window:maximize-toggle', () => {
+  if (!mainWindow) return false;
+  if (mainWindow.isMaximized()) mainWindow.unmaximize(); else mainWindow.maximize();
+  return mainWindow.isMaximized();
+});
+ipcMain.handle('window:close', () => { if (mainWindow) mainWindow.close(); return true; });
+ipcMain.handle('window:isMaximized', () => !!mainWindow && mainWindow.isMaximized());
+
+// ---- YouTube live (92 News / City 41 / Express News) ----------------
+// Resolves the current live video ID from the channel's /live page at
+// play time (see youtube.js); the renderer embeds it, falling back to
+// the live_stream embed by channel ID when resolution fails.
+ipcMain.handle('yt:resolveLive', (_e, url) => youtube.resolveYouTubeLive(url));
 
 // ---- in-app updater (mirrors Android UpdateChecker/UpdateFlow) --------
 ipcMain.handle('update:check', async () => updater.fetchLatest());
