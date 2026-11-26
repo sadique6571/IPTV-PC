@@ -2,14 +2,18 @@
 
 Live TV, movies and series on the computer — the same TV style as the
 Android IPTV app, for **Windows first** (Linux later from the same code).
-Local-only project; nothing here is published anywhere yet.
+Source and Windows releases are hosted on GitHub.
 
 ## What it is
 
-- **Live TV** — the 109 built-in channels from the Android app
-  (`assets/channels.m3u`, same file), categories, search, favorites,
-  custom M3U playlist loading. Playback with hls.js; raw MPEG-TS streams
-  via mpegts.js; YouTube live pages open in the system browser.
+- **Live TV** — the built-in playlist includes Pakistani channels, Indian
+  music and selected Hindi kids' cartoons, and English-language cricket.
+  Categories, search, favorites, and custom M3U playlists are supported.
+  HLS and raw MPEG-TS play with hls.js and mpegts.js. YouTube video and
+  playlist entries use the embedded player. Cricket Gold uses the native
+  HLS player. European Cricket Network and Cricket Ireland use the embedded
+  YouTube player when a live broadcast is available. Cricket entries with
+  no in-app feed show their availability in the app.
 - **Movies / Series** — the same MovieBox source as the Android app:
   visitor login + HMAC-MD5 signed mobile API (search, details, seasons),
   playable MP4s from `resourceDetectors` / `play-info/v2` and the website
@@ -17,15 +21,10 @@ Local-only project; nothing here is published anywhere yet.
   English subtitles from the caption endpoint, Continue Watching.
 - **Player** — one player for TV and movies: play/pause, −10s/+10s, seek
   bar, quality menu, CC toggle, Prev/Next episode, fullscreen.
-- **In-app updater** — mirrors the Android UpdateChecker: on startup
-  (once a day) and via "Check for updates", it queries the public GitHub
-  Releases API for the latest release, compares versions, and offers a
-  Download that fetches + SHA-256-verifies the portable exe. Nothing
-  downloads without asking. Config lives in `src/update-config.js`
-  (owner `sadique6571`, repo `IPTV-PC`, asset `IPTV-Desktop-portable.exe`).
-  A running .exe cannot replace itself, so the update is downloaded into
-  the app's userData `updates/` folder and the user runs the new file
-  after closing the app.
+- **In-app updater** — installed Windows builds check GitHub on startup
+  at most once a day and from **Check for updates**. Choose **Download**
+  to fetch and verify the Windows update, then **Install & Restart** to
+  upgrade in place and reopen the app.
 
 ## Run it (development)
 
@@ -37,20 +36,25 @@ npm start
 ## Build it
 
 ```sh
-# Windows portable exe + unpacked dir (builds fine on Linux — no Wine
-# needed; electron-builder downloads its own NSIS/7-Zip tooling)
+# On Windows with a configured local Authenticode certificate
 npm run build:win
-# Windows unpacked dir only
-npm run build:win-dir
 # Linux unpacked dir
 npm run build:linux
 ```
 
-Output goes to `dist/`. The portable exe is
-`dist/IPTV-Desktop-portable.exe` (version-free name, like the Android
-app's constant `IPTV.apk`, so the updater never needs a name change).
-The Windows build is **unsigned** (no code-signing certificate yet), so
-Windows SmartScreen will warn on first run — "Run anyway" to launch.
+The Windows output is `dist/IPTV-Desktop-Setup-<version>.exe`. The setup
+wizard lets users choose the install folder and creates Desktop and Start
+Menu shortcuts. For local signing, configure `IPTV_SIGNING_THUMBPRINT`
+or `WIN_CSC_LINK` before building.
+
+## Code signing policy
+
+SignPath Foundation signing is planned, pending approval. The
+GitHub-hosted release workflow signs the app and Setup EXE separately,
+verifies both signatures, and creates a draft release with the matching
+update metadata. Sadique Sadiq (@sadique6571) maintains the project,
+reviews changes, and approves signing requests. See the
+[SignPath application and release setup](docs/signpath-application.md).
 
 ## Project layout
 
@@ -60,8 +64,7 @@ src/
   main.js               Window, state file, IPC, media-header injection
   preload.js            Minimal contextBridge (no Node in the renderer)
   moviebox.js           MovieBox client (signed API + H5 + captions + feeds)
-  updater.js            GitHub-releases updater (Android UpdateChecker parity)
-  update-config.js      Update repo/asset/build-code constants (one-line change)
+  updater.js            GitHub Releases updates for installed Windows builds
   renderer/
     index.html          App shell (header, split list/player, update dialog)
     styles.css          TV-style dark glass theme (Android palette)
@@ -69,18 +72,52 @@ src/
     channels.js         M3U parser
     vendor/             hls.min.js, mpegts.js (copied from node_modules)
 assets/
-  channels.m3u          The 109 built-in channels (same file as the Android app)
+  channels.m3u          Built-in TV, music, kids' cartoons, and cricket sources
 docs/
   moviebox-api.md       Exhaustive MovieBox API spec (from the Kotlin source)
   ui-spec.md            Android UI/design spec (colors, layout, player bar)
 ```
 
-State (favorites, Continue Watching, custom playlist, MovieBox token,
-update last-check) lives in the app's userData folder as JSON files —
-no telemetry, no auto-updater, no accounts.
+## Privacy
+
+Favorites, Continue Watching, custom playlists, the MovieBox visitor
+token, and the time of the last update check are stored locally. The app
+contacts GitHub to check for updates, media providers to load streams and
+metadata, and YouTube when an embedded YouTube channel is selected. The
+app starts the first channel on launch, which contacts its provider.
+Media providers can log requests under their own privacy policies.
+
+## License
+
+Original project code and documentation are available under the
+[MIT license](LICENSE). See the [third-party notices](docs/third-party-notices.md)
+for bundled components and artwork.
 
 ## Verified (2026-11-25, first build)
 
+- **v1.0.4 (2026-11-26)**: HEVC/H.265 movies now play — the MP4 movie
+  path gets the same safety net as live TV: an 8s no-frames watchdog
+  (fires on error 4, or on audio playing with no frames), tries the next
+  source in descending quality, then routes through the existing ffmpeg
+  transcode to H.264/AAC HLS. Messages are codec-generic ("Ye format
+  app mein seedha nahi chalta — convert ho raha hai…"). Quality switches
+  reset the per-URL watchdog/transcode state. Two transcode fixes found
+  while verifying: `-timeout` is only passed for http:// inputs (ffmpeg
+  rejects it for HTTPS — the transcode died before starting), and audio
+  is downmixed to stereo (`-ac 2`) because some files carry 5.1 AAC with
+  an unknown channel layout that the AAC encoder rejects ("Unsupported
+  channel layout"). Version 1.0.4, BUILD_CODE 5 (tag v1.0.4.5). Verified
+  2026-11-26 under Xvfb (system ffmpeg): Chal Mera Putt (both sources
+  HEVC) plays via transcode (848×360, currentTime 0:32/4:14, playing);
+  The Avengers (all 4 sources HEVC) plays via transcode (1920×1080,
+  currentTime advancing); a manual quality switch to an HEVC source
+  re-runs the fallback and plays via transcode; Delhi 2021 1080p (H.264)
+  plays direct (1920×1080, no ffmpeg spawned); PTV Home HLS plays
+  direct (1280×720, 15.6s, no ffmpeg); Geo Super still transcodes
+  (768×576). Test-harness notes (not app changes): the sandbox renderer
+  needs `--ignore-certificate-errors --proxy-server=...` +
+  `IPTV_PROXY_AUTH` for its https fetches, and `setMediaHeaders` (the
+  mobile UA) for the file CDN, which answers 428 to a desktop browser UA.
 - **v1.0.3 (2026-11-25)**: ffmpeg transcode for MPEG-2 — Geo Super
   plays in-app (transcoded to H.264 + AAC HLS on localhost; falls back
   to the VLC message if ffmpeg fails; PTV Home still plays direct, no
@@ -166,4 +203,3 @@ no telemetry, no auto-updater, no accounts.
   built-in + M3U playlists only).
 - **No downloads** (the Android app downloads movies; desktop v1 is
   streaming only).
-- The app uses the default Electron icon (no custom icon set yet).

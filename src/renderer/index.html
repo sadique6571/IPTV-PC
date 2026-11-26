@@ -68,14 +68,14 @@
     <section id="rightPane">
       <div id="playerWrap">
         <video id="video" playsinline></video>
-        <iframe id="ytFrame" class="yt-frame hidden" title="YouTube live" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        <iframe id="ytFrame" class="yt-frame hidden" title="YouTube player" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen></iframe>
         <button id="ytOpenBrowser" class="yt-browser-btn hidden" title="Agar YouTube embed na chale to browser mein kholein">↗ Browser mein kholein</button>
         <div id="nowPlaying" class="now-playing hidden"></div>
         <div id="bigPlay" class="big-play hidden">▶</div>
         <button id="showListBtn" class="show-list hidden" title="List dikhao (L)">☰ List dikhao</button>
         <div id="codecMsg" class="codec-msg hidden">
-          <div class="codec-title">Ye channel MPEG-2 video hai</div>
-          <div class="codec-text">Browser player mein iski picture nahi chal sakti — isko external player (jaise VLC) mein kholein.</div>
+          <div class="codec-title" id="codecTitle">Ye channel MPEG-2 video hai</div>
+          <div class="codec-text" id="codecText">Browser player mein iski picture nahi chal sakti — isko external player (jaise VLC) mein kholein.</div>
           <button id="btnOpenExternal" class="btn primary">VLC mein kholo</button>
         </div>
         <div id="playerBar">
@@ -97,7 +97,7 @@
     </section>
   </main>
 
-  <!-- Update dialog (mirrors the Android update flow) -->
+  <!-- Update dialog -->
   <div id="updateDialog" class="overlay hidden">
     <div class="dialog">
       <div class="dlg-title">⬆ App Update</div>
@@ -111,7 +111,7 @@
       <div class="dlg-actions">
         <button id="updLater" class="btn">Baad mein</button>
         <button id="updDownload" class="btn primary">Download</button>
-        <button id="updShowFile" class="btn primary hidden">Show in folder</button>
+        <button id="updInstall" class="btn primary hidden">Install &amp; Restart</button>
         <button id="updClose" class="btn hidden">Close</button>
       </div>
     </div>

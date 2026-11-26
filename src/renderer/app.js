@@ -2,7 +2,7 @@
 // TV-style: left list, right player, arrow-key navigation throughout.
 'use strict';
 
-/* global Hls, parseM3U */
+/* global Hls, parseM3U, parseYouTubeSource */
 const $ = (id) => document.getElementById(id);
 const video = $('video');
 const toastEl = $('toast');
@@ -284,8 +284,32 @@ let transcodeOriginalUrl = '';
 let transcodeAttemptedFor = '';
 let transcodeWatchdog = null;
 
+// MP4 no-frames watchdog (v1.0.4): movies/series play as direct MP4s,
+// and some MovieBox MP4s are HEVC/H.265, which Chromium cannot decode
+// at all. That shows as no picture — audio may still play (Windows) or
+// the element may error outright (error 4, readyState 0). When no
+// frames appear within ~8s, try the next source, else transcode.
+// mp4TriedUrls stops the fallback from retrying a dead URL in a loop;
+// mp4NoFrameRounds gives a slow-but-healthy load one extra window.
+let mp4NoFrameTimer = null;
+let mp4TriedUrls = [];
+let mp4NoFrameRounds = 0;
+
 function hideCodecMsg() { $('codecMsg').classList.add('hidden'); }
-function showCodecMsg() { $('codecMsg').classList.remove('hidden'); }
+function showCodecMsg(kind) {
+  // The fallback message must name the right problem: an MPEG-2 live
+  // channel vs an HEVC (or otherwise undecodable) movie file.
+  const title = $('codecTitle');
+  const text = $('codecText');
+  if (kind === 'movie') {
+    if (title) title.textContent = 'Ye movie is format mein nahi chal sakti';
+    if (text) text.textContent = 'Is movie ki video (HEVC) browser player mein nahi chal sakti — convert bhi nahi ho saka. Isko external player (jaise VLC) mein kholein.';
+  } else {
+    if (title) title.textContent = 'Ye channel MPEG-2 video hai';
+    if (text) text.textContent = 'Browser player mein iski picture nahi chal sakti — isko external player (jaise VLC) mein kholein.';
+  }
+  $('codecMsg').classList.remove('hidden');
+}
 function openInExternalPlayer() {
   if (!currentStreamUrl) return;
   window.api.openExternal(currentStreamUrl);
@@ -298,6 +322,7 @@ function attachSource(url) {
   if (mpegtsPlayer) { try { mpegtsPlayer.destroy(); } catch (_) {} mpegtsPlayer = null; }
   if (hlsRetryTimer) { clearTimeout(hlsRetryTimer); hlsRetryTimer = null; }
   if (mpegtsNoFrameTimer) { clearTimeout(mpegtsNoFrameTimer); mpegtsNoFrameTimer = null; }
+  if (mp4NoFrameTimer) { clearTimeout(mp4NoFrameTimer); mp4NoFrameTimer = null; }
   if (transcodeWatchdog) { clearTimeout(transcodeWatchdog); transcodeWatchdog = null; }
   // A re-attach of our own transcode playlist (hls.js retry) keeps the
   // transcode alive; ANY other source stops it — ffmpeg must never
@@ -380,6 +405,10 @@ function attachSource(url) {
     });
   } else if (isMp4) {
     video.src = url;
+    // Movies/series only: a direct MP4 the browser cannot decode
+    // (HEVC) shows no picture and never errors on Windows — watch for
+    // frames and fall back (next source, then transcode).
+    if (current && current.kind === 'movie') armMp4NoFrameWatchdog(url);
   } else if (window.mpegts && mpegts.isSupported()) {
     // Raw MPEG-TS streams with no playlist (7 channels on IP:port hosts)
     // — ExoPlayer sniffs these on Android; here mpegts.js plays them
@@ -396,7 +425,7 @@ function attachSource(url) {
       mpegtsPlayer.on(mpegts.Events.MEDIA_INFO, (info) => {
         const codec = String((info && info.videoCodec) || '').toLowerCase();
         if (info && info.hasVideo && codec && !codec.includes('avc')) {
-          handleUnplayableTs(url);
+          handleUnplayableSource(url, 'ts');
         }
       });
       mpegtsPlayer.load();
@@ -407,7 +436,7 @@ function attachSource(url) {
       mpegtsNoFrameTimer = setTimeout(() => {
         mpegtsNoFrameTimer = null;
         if (mpegtsPlayer && currentStreamUrl === url && video.videoWidth === 0) {
-          handleUnplayableTs(url);
+          handleUnplayableSource(url, 'ts');
         }
       }, 8000);
     } catch (e) {
@@ -418,15 +447,22 @@ function attachSource(url) {
     video.src = url;
   }
 }
-// A raw TS stream the browser can't decode (MPEG-2 video): transcode it
-// in the main process and play the localhost HLS playlist. If the
-// transcode fails — or still shows no frames 10s after attaching — fall
-// back to the honest message + VLC button, never a silent black screen.
-async function handleUnplayableTs(url) {
-  if (transcodeAttemptedFor === url) { showCodecMsg(); return; }
+// A stream the browser can't decode: transcode it in the main process
+// and play the localhost HLS playlist. kind 'ts' = an MPEG-2 live
+// channel; kind 'movie' = a direct MP4 (usually HEVC) that showed no
+// frames. If the transcode fails — or still shows no frames 10s after
+// attaching — fall back to the honest message + VLC button, never a
+// silent black screen.
+async function handleUnplayableSource(url, kind) {
+  if (transcodeAttemptedFor === url) { showCodecMsg(kind); return; }
   transcodeAttemptedFor = url;
-  toast('MPEG-2 hai — app mein chalane ke liye convert ho raha hai…');
-  $('statusBar').textContent = 'MPEG-2 convert ho raha hai…';
+  if (kind === 'movie') {
+    toast('Ye format app mein seedha nahi chalta — convert ho raha hai…');
+    $('statusBar').textContent = 'Convert ho raha hai…';
+  } else {
+    toast('MPEG-2 hai — app mein chalane ke liye convert ho raha hai…');
+    $('statusBar').textContent = 'MPEG-2 convert ho raha hai…';
+  }
   let res;
   try {
     res = await window.api.startTranscode(url);
@@ -441,14 +477,21 @@ async function handleUnplayableTs(url) {
   }
   if (!res || !res.ok) {
     console.warn('transcode failed:', res && res.error);
-    showCodecMsg();
+    showCodecMsg(kind);
+    if (kind === 'movie') $('statusBar').textContent = 'Convert nahi ho saka' + (current && current.playLabel ? ': ' + current.playLabel : '');
     toast('Convert nahi ho saka — VLC mein kholein');
     return;
   }
   transcodePlaylistUrl = res.playlistUrl;
   transcodeOriginalUrl = url;
   attachSource(res.playlistUrl);
+  // Play unconditionally: the pause state here was caused by the
+  // failed source (an HEVC load errors with the element paused), not
+  // by the user — the fixed stream must start, as the TS path always did.
   video.play().catch(() => {});
+  if (kind === 'movie' && current && current.playLabel) {
+    $('statusBar').textContent = 'Playing: ' + current.playLabel + ' (convert karke)';
+  }
   transcodeWatchdog = setTimeout(() => {
     transcodeWatchdog = null;
     if (video.videoWidth === 0) {
@@ -456,18 +499,87 @@ async function handleUnplayableTs(url) {
       transcodePlaylistUrl = '';
       transcodeOriginalUrl = '';
       window.__transcode = null;
-      showCodecMsg();
+      showCodecMsg(kind);
       toast('Convert nahi ho saka — VLC mein kholein');
     }
   }, 10000);
+}
+// MP4 no-frames watchdog (v1.0.4): arm a timer when a movie MP4 is
+// attached; if no frames exist when it fires, fall back. Two rounds
+// max (16s): a load with no metadata, no error and no progress yet
+// gets one extra window instead of killing a slow-but-healthy movie.
+// A transcode already starting for this playback blocks the watchdog
+// (its guard is transcodeAttemptedFor) so a slow ffmpeg start is
+// never hijacked by a source switch.
+function armMp4NoFrameWatchdog(url) {
+  if (mp4NoFrameTimer) { clearTimeout(mp4NoFrameTimer); mp4NoFrameTimer = null; }
+  mp4NoFrameRounds = 0;
+  const check = () => {
+    mp4NoFrameTimer = null;
+    if (currentStreamUrl !== url) return;
+    if (video.videoWidth > 0) return;
+    if (transcodeAttemptedFor) return;
+    // Still loading with no error and no progress at all: one more
+    // window, then treat it as unplayable.
+    if (!video.error && video.readyState < 1 && video.currentTime === 0 && mp4NoFrameRounds < 1) {
+      mp4NoFrameRounds += 1;
+      mp4NoFrameTimer = setTimeout(check, 8000);
+      return;
+    }
+    handleMp4NoFrames(url);
+  };
+  mp4NoFrameTimer = setTimeout(check, 8000);
+}
+// Next untried movie source, highest quality first (currentSources is
+// ascending, so walk it backwards), skipping the failed URL and any
+// URL already tried for this playback.
+function nextUntriedMovieSource(failedUrl) {
+  for (let i = currentSources.length - 1; i >= 0; i -= 1) {
+    const s = currentSources[i];
+    if (s.url !== failedUrl && !mp4TriedUrls.includes(s.url)) return s;
+  }
+  return null;
+}
+// A movie MP4 showed no frames (HEVC or another undecodable codec):
+// try the next quality — a lower one may be H.264 — and only when no
+// source plays, transcode the BEST (highest-quality) source via ffmpeg.
+function handleMp4NoFrames(url) {
+  if (transcodeAttemptedFor) return;
+  mp4TriedUrls.push(url);
+  const next = nextUntriedMovieSource(url);
+  if (next) {
+    toast('Ye quality nahi chal rahi — doosri quality try ho rahi hai…');
+    const pos = video.currentTime;
+    attachSource(next.url);
+    video.addEventListener('loadedmetadata', function once() {
+      video.removeEventListener('loadedmetadata', once);
+      if (isFinite(video.duration) && pos > 0) { try { video.currentTime = pos; } catch (_) {} }
+    });
+    // Play unconditionally (see handleUnplayableSource): the pause was
+    // caused by the failed source, not by the user.
+    video.play().catch(() => {});
+    return;
+  }
+  // All sources failed direct: transcode the best source, not the
+  // last-tried (lowest) one. Re-attach it first so the transcode's
+  // "user moved on" guard (currentStreamUrl === url) holds for it;
+  // the transcodeAttemptedFor guard above stops the re-armed watchdog
+  // and the error fast-path from hijacking the transcode while ffmpeg
+  // starts.
+  const best = currentSources[currentSources.length - 1];
+  const target = best ? best.url : url;
+  if (target !== url) attachSource(target);
+  handleUnplayableSource(target, 'movie');
 }
 function playSource(url, opts) {
   opts = opts || {};
   // A fresh explicit play gets a fresh transcode attempt (a transient
   // ffmpeg failure must not stay sticky for the channel).
   transcodeAttemptedFor = '';
+  mp4TriedUrls = [];
   currentSources = opts.sources || [{ label: 'Auto', url }];
   current = Object.assign({ kind: 'tv' }, opts.meta || {});
+  if (opts.title) current.playLabel = opts.title;
   attachSource(url);
   video.muted = false;
   const p = video.play();
@@ -488,12 +600,9 @@ function playSource(url, opts) {
   updateUpNext();
 }
 function playChannel(ch) {
-  // YouTube live channels (92 News, City 41, Express News) are not
-  // media streams — they play inside the app via a YouTube embed
-  // (v1.0.3); the system browser only opens if the embed cannot be
-  // built at all (see playYouTubeChannel).
-  if (/youtube\.com/i.test(ch.url)) {
-    playYouTubeChannel(ch);
+  const web = ch.unavailable || ch.openInBrowser ? {} : parseYouTubeSource(ch.url);
+  if (web) {
+    playWebChannel(ch, web);
     return;
   }
   const idx = channels.indexOf(ch);
@@ -506,7 +615,7 @@ function playChannel(ch) {
   });
   $('statusBar').textContent = 'Playing: ' + ch.name;
 }
-// ---------- YouTube live in-app (v1.0.3) ----------
+// ---------- YouTube playback ----------
 // Channel IDs are stable (unlike live video IDs, which change on every
 // stream restart), so they are the fallback anchor. Resolved once from
 // each channel's public page; the live VIDEO id is resolved fresh at
@@ -517,23 +626,25 @@ const YT_CHANNEL_IDS = {
   'expressnewspkofficial': 'UCF-uOc4AYA9uyH7ZFUTZEIg',
 };
 let ytActive = false;
+let ytSelection = 0;
 function showYouTubeEmbed(embedUrl, ch) {
   const frame = $('ytFrame');
   frame.src = embedUrl;
   frame.classList.remove('hidden');
   $('playerWrap').classList.add('yt-mode');
-  $('ytOpenBrowser').classList.remove('hidden');
+  $('ytOpenBrowser').classList.toggle('hidden', ch.group === 'Sports');
   ytActive = true;
   current = { kind: 'tv', channel: ch, channelIndex: channels.indexOf(ch) };
   currentSources = [];
   hideCodecMsg();
   const np = $('nowPlaying');
-  np.textContent = '▶ ' + ch.name + ' (YouTube live)';
+  np.textContent = '▶ ' + ch.name;
   np.classList.remove('hidden');
-  $('statusBar').textContent = 'Playing: ' + ch.name + ' (YouTube live)';
+  $('statusBar').textContent = 'YouTube: ' + ch.name;
   updateUpNext();
 }
 function hideYouTubeEmbed() {
+  ytSelection += 1;
   if (!ytActive) return;
   ytActive = false;
   $('ytOpenBrowser').classList.add('hidden');
@@ -542,7 +653,9 @@ function hideYouTubeEmbed() {
   frame.classList.add('hidden');
   $('playerWrap').classList.remove('yt-mode');
 }
-async function playYouTubeChannel(ch) {
+async function playWebChannel(ch, source) {
+  hideYouTubeEmbed();
+  const selection = ytSelection;
   // Stop whatever was playing (normal stream or another embed).
   if (hls) { hls.destroy(); hls = null; }
   if (mpegtsPlayer) { try { mpegtsPlayer.destroy(); } catch (_) {} mpegtsPlayer = null; }
@@ -551,36 +664,42 @@ async function playYouTubeChannel(ch) {
   try { video.pause(); } catch (_) {}
   video.removeAttribute('src');
   video.load();
+  current = null;
+  currentSources = [];
+  $('nowPlaying').classList.add('hidden');
+  hideCodecMsg();
+  updateUpNext();
   window.api.setMediaHeaders(null);
-  $('statusBar').textContent = 'YouTube live load ho raha hai: ' + ch.name;
-  const m = ch.url.match(/youtube\.com\/@([^/?#]+)/i);
-  const handle = m ? m[1].toLowerCase() : '';
-  // 1) Resolve the current live video ID from the /live page.
-  let videoId = null;
-  try {
-    const r = await window.api.resolveYouTubeLive(ch.url);
-    if (r && r.videoId) videoId = r.videoId;
-    else console.warn('yt resolve failed:', r && r.error);
-  } catch (e) { console.warn('yt resolve error:', e); }
-  // 2) Fall back to the live_stream embed, which resolves the live
-  // video itself at load time from the (stable) channel ID.
-  let embedUrl = null;
-  // NOTE: youtube.com (not youtube-nocookie.com) — the nocookie host
-  // returns ERR_EMPTY_RESPONSE inside Chromium here, while youtube.com
-  // loads the player; on a normal PC both work, youtube.com is the
-  // safer default. If the embed itself fails on the user's PC (e.g.
-  // YouTube Error 153), the "Browser mein kholein" button in yt-mode
-  // is the escape hatch — never a dead black player.
-  if (videoId) embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
-  else if (YT_CHANNEL_IDS[handle]) embedUrl = `https://www.youtube.com/embed/live_stream?channel=${YT_CHANNEL_IDS[handle]}&autoplay=1`;
-  // 3) Nothing worked — the old behaviour (browser), never a dead click.
-  if (!embedUrl) {
-    window.api.openExternal(ch.url);
-    toast('YouTube live — browser mein khul raha hai: ' + ch.name);
-    $('statusBar').textContent = 'YouTube live (browser): ' + ch.name;
+  if (source.embedUrl) {
+    showYouTubeEmbed(source.embedUrl, ch);
     return;
   }
-  showYouTubeEmbed(embedUrl, ch);
+  if (source.liveUrl) {
+    $('statusBar').textContent = 'YouTube live load ho raha hai: ' + ch.name;
+    let videoId;
+    try {
+      const result = await window.api.resolveYouTubeLive(source.liveUrl);
+      videoId = ch.group === 'Sports' && !result?.isLive ? null : result?.videoId;
+    } catch (error) { console.warn('YouTube live:', error.message); }
+    if (selection !== ytSelection) return;
+    const handle = new URL(source.liveUrl).pathname.match(/^\/@([^/]+)/)?.[1].toLowerCase();
+    const channelId = YT_CHANNEL_IDS[handle];
+    const embed = videoId
+      ? `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`
+      : channelId && `https://www.youtube.com/embed/live_stream?channel=${channelId}&autoplay=1`;
+    if (embed) {
+      showYouTubeEmbed(embed, ch);
+      return;
+    }
+  }
+  if (ch.unavailable || ch.group === 'Sports') {
+    const message = ch.unavailable ? 'In-app live feed unavailable' : 'Live broadcast unavailable right now';
+    $('statusBar').textContent = ch.name + ' - ' + message;
+    toast(message);
+    return;
+  }
+  window.api.openExternal(ch.url);
+  $('statusBar').textContent = 'Browser: ' + ch.name;
 }
 function playPause() {
   // A YouTube embed has its own controls — the app's play/pause must
@@ -599,6 +718,10 @@ function setQuality(label) {
   if (!src) return;
   const pos = video.currentTime;
   const wasPaused = video.paused;
+  // A manual quality switch gets a fresh unplayable attempt: the new
+  // URL may be HEVC even if the old one played (or vice versa).
+  transcodeAttemptedFor = '';
+  mp4TriedUrls = [];
   attachSource(src.url);
   video.addEventListener('loadedmetadata', function once() {
     video.removeEventListener('loadedmetadata', once);
@@ -651,10 +774,27 @@ video.addEventListener('playing', () => {
   if (video.videoWidth > 0) {
     hideCodecMsg();
     if (transcodeWatchdog) { clearTimeout(transcodeWatchdog); transcodeWatchdog = null; }
+    if (mp4NoFrameTimer) { clearTimeout(mp4NoFrameTimer); mp4NoFrameTimer = null; }
     if (transcodePlaylistUrl && current && current.channel) {
       $('statusBar').textContent = 'Playing: ' + current.channel.name + ' (MPEG-2 → H.264)';
     }
   }
+});
+// Undecodable MP4 (HEVC) can error immediately (MEDIA_ERR_SRC_NOT_SUPPORTED,
+// code 4) with no frames: fast-path the same fallback the watchdog runs,
+// instead of waiting out the 8s timer. Network errors (code 2) do NOT
+// fast-path — the watchdog's slow-load guard handles those. The
+// currentSrc check keeps a stale error from the empty-src load() in
+// attachSource from firing on a URL that never actually loaded.
+video.addEventListener('error', () => {
+  if (!video.error || video.error.code !== 4) return;
+  if (!current || current.kind !== 'movie') return;
+  if (!currentStreamUrl || !/\.(mp4|webm|mov|mkv)(\?|$)/i.test(currentStreamUrl)) return;
+  if (video.currentSrc !== currentStreamUrl) return;
+  if (video.videoWidth > 0) return;
+  if (transcodeAttemptedFor) return;
+  if (mp4NoFrameTimer) { clearTimeout(mp4NoFrameTimer); mp4NoFrameTimer = null; }
+  handleMp4NoFrames(currentStreamUrl);
 });
 video.addEventListener('click', playPause);
 $('btnPlay').onclick = playPause;
@@ -1163,57 +1303,71 @@ document.addEventListener('click', (e) => {
   if (!$('arrangeMenu').classList.contains('hidden') && !$('arrangeMenu').contains(e.target) && e.target.id !== 'arrangeBtn') closeArrangeMenu();
 });
 
-// ---------- in-app updater (mirrors Android UpdateChecker/UpdateFlow) ----------
-// Silent check runs once a day from the main process; manual check from
-// the header button. Nothing downloads without pressing Download, and a
-// running .exe cannot replace itself — the new portable exe is downloaded
-// + verified, then the user runs it after closing the app.
+// ---------- in-app installer updates ----------
 let pendingUpdate = null;
-let downloadedFile = null;
+let downloadedTag = null;
 
 function showUpdateDialog(update) {
+  if (pendingUpdate?.tag === update.tag) return;
   pendingUpdate = update;
-  downloadedFile = null;
-  $('updText').textContent = `Naya version aa gaya hai (${update.tag}). Download kar ke install karna hai?`;
+  const ready = downloadedTag === update.tag;
+  $('updText').textContent = `Naya version aa gaya hai (${update.tag}).`;
   const notes = $('updNotes');
   if (update.notes && update.notes.trim()) {
     notes.textContent = update.notes.trim().slice(0, 2000);
     notes.classList.remove('hidden');
   } else notes.classList.add('hidden');
   $('updProgress').classList.add('hidden');
-  $('updDone').classList.add('hidden');
-  $('updDownload').classList.remove('hidden');
-  $('updLater').classList.remove('hidden');
-  $('updShowFile').classList.add('hidden');
-  $('updClose').classList.add('hidden');
+  $('updDone').classList.toggle('hidden', !ready);
+  $('updDownload').classList.toggle('hidden', ready);
+  $('updLater').classList.toggle('hidden', ready);
+  $('updInstall').classList.toggle('hidden', !ready);
+  $('updClose').classList.toggle('hidden', !ready);
   $('updateDialog').classList.remove('hidden');
-  $('updDownload').focus();
+  $(ready ? 'updInstall' : 'updDownload').focus();
 }
 function hideUpdateDialog() { $('updateDialog').classList.add('hidden'); pendingUpdate = null; }
 
 $('updLater').onclick = hideUpdateDialog;
 $('updClose').onclick = hideUpdateDialog;
-$('updShowFile').onclick = () => { if (downloadedFile) window.api.showDownloadedFile(downloadedFile); };
+$('updInstall').onclick = async () => {
+  if (downloadedTag !== pendingUpdate?.tag) return;
+  $('updInstall').disabled = true;
+  $('updClose').disabled = true;
+  try {
+    clearTimeout(saveTimer);
+    if (!await window.api.saveState(state)) throw new Error('Settings save nahi ho sakin.');
+    await window.api.installUpdate();
+  } catch (e) {
+    toast('Update install nahi ho saka: ' + e.message);
+    $('updInstall').disabled = false;
+    $('updClose').disabled = false;
+  }
+};
 $('updDownload').onclick = async () => {
   if (!pendingUpdate) return;
+  const { tag } = pendingUpdate;
   $('updDownload').classList.add('hidden');
   $('updLater').classList.add('hidden');
   $('updProgress').classList.remove('hidden');
   $('updBar').value = 0;
   $('updPct').textContent = 'Download ho raha hai… 0%';
   try {
-    const r = await window.api.downloadUpdate(pendingUpdate);
-    downloadedFile = r.filePath;
+    await window.api.downloadUpdate(tag);
+    downloadedTag = tag;
     $('updProgress').classList.add('hidden');
     const done = $('updDone');
-    done.textContent = 'Download ho gaya hai. App band kar ke nayi file chalain — purani file aap khud delete kar sakte hain.';
+    done.textContent = 'Update tayyar hai. Install & Restart app ko dobara kholega.';
     done.classList.remove('hidden');
-    $('updShowFile').classList.remove('hidden');
+    $('updInstall').classList.remove('hidden');
     $('updClose').classList.remove('hidden');
+    $('updInstall').focus();
   } catch (e) {
     $('updProgress').classList.add('hidden');
     toast('Download fail ho gaya: ' + e.message);
-    hideUpdateDialog();
+    $('updDownload').classList.remove('hidden');
+    $('updLater').classList.remove('hidden');
+    $('updDownload').focus();
   }
 };
 window.api.onUpdateProgress((pct) => {
@@ -1227,7 +1381,7 @@ $('checkUpdate').onclick = async () => {
     const r = await window.api.checkUpdate();
     if (r && r.available) showUpdateDialog(r);
     else if (r && r.reason === 'up-to-date') toast('App up to date hai.');
-    else if (r && r.reason === 'not-found') toast('Update check nahi ho saka — release abhi publish nahi hui.');
+    else if (r && r.reason === 'unsupported') toast('Updates installed Windows version mein available hain.');
     else toast('Update check nahi ho saka — internet check karein.');
   } catch (e) {
     toast('Update check nahi ho saka — internet check karein.');
@@ -1303,9 +1457,8 @@ function initSplitter() {
 // ---------- boot ----------
 (async function boot() {
   tickClock();
-  const info = await window.api.paths();
-  const ver = await window.api.installedVersion();
-  $('version').textContent = ver.label;
+  const { version } = await window.api.paths();
+  $('version').textContent = `v${version}`;
   state = Object.assign(state, await window.api.loadState());
   initSplitter();
   if (state.listHidden) setListHidden(true, false);

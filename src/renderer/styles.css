@@ -1,4 +1,13 @@
 /* IPTV Desktop — TV-style dark theme (mirrors the Android app). */
+@font-face {
+  font-family: "IPTV Nastaliq";
+  src: local("Jameel Noori Nastaleeq"), local("JameelNooriNastaleeq"),
+       url("vendor/noto-nastaliq-urdu.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-08FF, U+200C-200F, U+FB50-FDFF, U+FE70-FEFF;
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
   --bg0: #091120;
@@ -30,7 +39,7 @@ body {
     radial-gradient(50% 50% at 92% 75%, rgba(92, 108, 255, 0.35), transparent 70%),
     linear-gradient(135deg, var(--bg0), var(--bg1) 55%, var(--bg2));
   color: var(--text);
-  font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: "IPTV Nastaliq", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 15px;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
@@ -40,7 +49,9 @@ body {
      stays visible against dark backgrounds. */
   border: 1px solid rgba(150,172,255,0.28); }
 .hidden { display: none !important; }
-button { font-family: inherit; color: var(--text); cursor: pointer; }
+button, input, textarea, select { font-family: inherit; }
+button { color: var(--text); cursor: pointer; }
+video::cue { font-family: "IPTV Nastaliq", sans-serif; }
 button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
   outline: 2px solid var(--focus); outline-offset: 1px;
 }

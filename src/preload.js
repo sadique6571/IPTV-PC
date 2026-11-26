@@ -30,11 +30,10 @@ contextBridge.exposeInMainWorld('api', {
   closeWindow: () => ipcRenderer.invoke('window:close'),
   isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
   onMaximizeChange: (cb) => ipcRenderer.on('window:maximize-changed', (_e, maximized) => cb(maximized)),
-  // In-app updater (mirrors Android UpdateChecker/UpdateFlow).
+  // In-app installer updates.
   checkUpdate: () => ipcRenderer.invoke('update:check'),
-  installedVersion: () => ipcRenderer.invoke('update:installed'),
-  downloadUpdate: (update) => ipcRenderer.invoke('update:download', update),
-  showDownloadedFile: (filePath) => ipcRenderer.invoke('update:showFile', filePath),
+  downloadUpdate: (tag) => ipcRenderer.invoke('update:download', tag),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
   onUpdateAvailable: (cb) => ipcRenderer.on('update:available', (_e, update) => cb(update)),
   onUpdateProgress: (cb) => ipcRenderer.on('update:progress', (_e, pct) => cb(pct)),
 });

@@ -135,6 +135,9 @@ async function main() {
     try {
       const dest = path.join(outDir, 'ffmpeg.exe');
       fs.copyFileSync(src, dest);
+      for (const suffix of ['.LICENSE', '.README']) {
+        if (fs.existsSync(src + suffix)) fs.copyFileSync(src + suffix, dest + suffix);
+      }
       // Static checks only — a Windows exe cannot run its -version here.
       const buf = fs.readFileSync(dest);
       // NOTE: Buffer.indexOf(value, byteOffset, encoding) takes an ENCODING

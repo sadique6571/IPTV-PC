@@ -136,6 +136,11 @@ async function startTranscode(sourceUrl) {
     return { ok: false, error: 'localhost server failed: ' + String(e) };
   }
   const playlistUrl = `http://127.0.0.1:${port}/live.m3u8`;
+  // NOTE (v1.0.4): -timeout is an AVOption of the http/tcp protocols
+  // only — ffmpeg rejects it ("Option timeout not found") for HTTPS
+  // inputs (MP4 movies), which kills the transcode before it starts.
+  // Plain-http live inputs (Geo Super) accept it, so keep it there.
+  const timeoutArgs = sourceUrl.startsWith('http://') ? ['-timeout', '15000000'] : [];
   const args = [
     '-v', 'error',
     '-nostdin',
@@ -144,7 +149,7 @@ async function startTranscode(sourceUrl) {
     '-reconnect_at_eof', '1',
     '-reconnect_streamed', '1',
     '-reconnect_delay_max', '5',
-    '-timeout', '15000000',
+    ...timeoutArgs,
     '-i', sourceUrl,
     '-map', '0:v:0',
     '-map', '0:a:0?',
@@ -157,7 +162,13 @@ async function startTranscode(sourceUrl) {
     '-g', '48',
     '-sc_threshold', '0',
     '-pix_fmt', 'yuv420p',
+    // Downmix to stereo: some MovieBox files carry 5.1 AAC with an
+    // UNKNOWN channel layout, which the native AAC encoder rejects
+    // ("Unsupported channel layout") and which Chromium also refuses
+    // to load at all — downmixing sidesteps both. Stereo input is
+    // unaffected (a no-op). (v1.0.4)
     '-c:a', 'aac',
+    '-ac', '2',
     '-b:a', '128k',
     '-f', 'hls',
     '-hls_time', '2',
@@ -168,7 +179,7 @@ async function startTranscode(sourceUrl) {
   ];
   let proc;
   try {
-    proc = spawn(bin, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    proc = spawn(bin, args, { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true });
   } catch (e) {
     try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
     return { ok: false, error: 'ffmpeg spawn failed: ' + String(e) };

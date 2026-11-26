@@ -14,6 +14,9 @@ const moviebox = require('./moviebox');
 const updater = require('./updater');
 const transcode = require('./transcode');
 const youtube = require('./youtube');
+const appId = 'com.sadique.iptv.desktop'; // Matches build.appId in package.json.
+
+if (process.platform === 'win32') app.setAppUserModelId(appId);
 
 let mainWindow = null;
 // Current movie playback's file-request headers (see onBeforeSendHeaders).
@@ -72,6 +75,7 @@ function createWindow() {
     },
   });
 
+  mainWindow.webContents.once('did-finish-load', () => silentUpdateCheck());
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   mainWindow.on('closed', () => { mainWindow = null; });
   // Custom title bar: keep the maximise/restore button icon in sync.
@@ -135,26 +139,27 @@ app.whenReady().then(() => {
   // injected only for requests to that stream's host, nothing else.
   session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     try {
-      if (mediaHeaders && details.url) {
-        const u = new URL(details.url);
-        if (u.host === mediaHeaders.host) {
-          const requestHeaders = { ...details.requestHeaders };
-          if (mediaHeaders.referer) requestHeaders.Referer = mediaHeaders.referer;
-          if (mediaHeaders.cookie) requestHeaders.Cookie = mediaHeaders.cookie;
-          requestHeaders['User-Agent'] =
-            'com.community.oneroom/50020044 (Linux; U; Android 11; en_US; 2201117TY; Build/RP1A.200720.011; Cronet/135.0.7012.3)';
-          callback({ requestHeaders });
-          return;
-        }
+      const u = new URL(details.url);
+      if (details.resourceType === 'subFrame' && u.origin === 'https://www.youtube.com' &&
+          u.pathname.startsWith('/embed/')) {
+        // Identify the desktop app to the YouTube player on a local file origin.
+        callback({ requestHeaders: { ...details.requestHeaders, Referer: `https://${appId}/` } });
+        return;
+      }
+      if (mediaHeaders && u.host === mediaHeaders.host) {
+        const requestHeaders = { ...details.requestHeaders };
+        if (mediaHeaders.referer) requestHeaders.Referer = mediaHeaders.referer;
+        if (mediaHeaders.cookie) requestHeaders.Cookie = mediaHeaders.cookie;
+        requestHeaders['User-Agent'] =
+          'com.community.oneroom/50020044 (Linux; U; Android 11; en_US; 2201117TY; Build/RP1A.200720.011; Cronet/135.0.7012.3)';
+        callback({ requestHeaders });
+        return;
       }
     } catch (_) { /* fall through */ }
     callback({});
   });
 
   createWindow();
-
-  // Silent update check (once a day at most) — runs in the background.
-  silentUpdateCheck();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -193,8 +198,6 @@ ipcMain.handle('channels:bundled', () => {
   }
 });
 ipcMain.handle('shell:openExternal', (_e, url) => {
-  // YouTube live pages (3 channels) are not media streams — open them in
-  // the system browser, the way the Android app uses a WebView for them.
   if (typeof url === 'string' && /^https?:\/\//.test(url)) shell.openExternal(url);
   return true;
 });
@@ -236,22 +239,14 @@ ipcMain.handle('window:isMaximized', () => !!mainWindow && mainWindow.isMaximize
 // the live_stream embed by channel ID when resolution fails.
 ipcMain.handle('yt:resolveLive', (_e, url) => youtube.resolveYouTubeLive(url));
 
-// ---- in-app updater (mirrors Android UpdateChecker/UpdateFlow) --------
+// ---- in-app installer updates ----------------------------------------
 ipcMain.handle('update:check', async () => updater.fetchLatest());
-ipcMain.handle('update:installed', () => ({
-  label: updater.installedVersionLabel(),
-  code: updater.installedVersionCode(),
-}));
-ipcMain.handle('update:download', async (event, update) => {
-  const filePath = await updater.downloadUpdate(update, (pct) => {
-    event.sender.send('update:progress', pct);
+ipcMain.handle('update:download', async (event, tag) => {
+  await updater.downloadUpdate(tag, (pct) => {
+    if (!event.sender.isDestroyed()) event.sender.send('update:progress', pct);
   });
-  return { filePath };
 });
-ipcMain.handle('update:showFile', (_e, filePath) => {
-  updater.showDownloadedFile(filePath);
-  return true;
-});
+ipcMain.handle('update:install', () => updater.installUpdate());
 
 // Silent once-a-day check on startup: only surfaces when a newer
 // release actually exists; failures stay silent (Android parity).

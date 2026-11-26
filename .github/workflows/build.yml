@@ -1,41 +1,140 @@
-name: IPTV Desktop
+name: IPTV Desktop signed release
 
 on:
   push:
-    branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
+concurrency:
+  group: windows-release-${{ github.ref }}
+
+permissions:
+  actions: read
+  contents: read
+
 jobs:
-  build:
-    runs-on: windows-latest
+  sign-windows:
+    runs-on: windows-2022
+    timeout-minutes: 150
+    env:
+      SIGNPATH_PUBLISHER_NAME: ${{ vars.SIGNPATH_PUBLISHER_NAME }}
+    outputs:
+      version: ${{ steps.release.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          node-version: 22
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Validate the release tag and signing settings
+        id: release
+        shell: pwsh
+        env:
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        run: |
+          $version = node -p "require('./package.json').version"
+          if ($version -notmatch '^\d+\.\d+\.\d+$' -or $env:GITHUB_REF -cne "refs/tags/v$version") {
+            throw "Run this workflow against the stable release tag v$version."
+          }
+          foreach ($setting in 'SIGNPATH_ORGANIZATION_ID', 'SIGNPATH_PUBLISHER_NAME', 'SIGNPATH_API_TOKEN') {
+            if (-not [Environment]::GetEnvironmentVariable($setting)) {
+              throw "Configure $setting for the approved SignPath project."
+            }
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
       - run: npm ci
-      - run: npm run build:win
-      - uses: actions/upload-artifact@v4
+      - name: Build the Windows application
+        run: node scripts/signpath-release.js app
+      - name: Upload application for signing
+        id: app-artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: IPTV-Desktop-portable
-          path: dist/IPTV-Desktop-portable.exe
+          name: signpath-application-input
+          path: dist/signpath/win-unpacked/IPTV Desktop.exe
+          retention-days: 1
+          if-no-files-found: error
+      - name: Sign application
+        uses: signpath/github-action-submit-signing-request@a2c5b60d9c75f073142b653c354b632eedce097b # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: iptv-desktop
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: windows-app
+          github-artifact-id: ${{ steps.app-artifact.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: dist/signpath/signed-app
+      - name: Package the signed application into Setup
+        run: node scripts/signpath-release.js setup
+      - name: Upload Setup for signing
+        id: setup-artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: signpath-setup-input
+          path: dist/signpath/setup/IPTV-Desktop-Setup-${{ steps.release.outputs.version }}.exe
+          retention-days: 1
+          if-no-files-found: error
+      - name: Sign Setup
+        uses: signpath/github-action-submit-signing-request@a2c5b60d9c75f073142b653c354b632eedce097b # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: iptv-desktop
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: windows-setup
+          github-artifact-id: ${{ steps.setup-artifact.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: dist/signpath/signed-setup
+      - name: Verify signatures and generate update metadata
+        run: node scripts/signpath-release.js finalize
+      - name: Verify installation and shortcuts
+        shell: pwsh
+        run: |
+          $setup = Get-Item "dist/signpath/release/IPTV-Desktop-Setup-${{ steps.release.outputs.version }}.exe"
+          $result = Start-Process -FilePath $setup.FullName -ArgumentList '/S', '/currentuser' -Wait -PassThru
+          if ($result.ExitCode -ne 0) { throw "Setup returned exit code $($result.ExitCode)." }
+          $desktop = [Environment]::GetFolderPath('DesktopDirectory')
+          $programs = [Environment]::GetFolderPath('Programs')
+          $shell = New-Object -ComObject WScript.Shell
+          $targets = foreach ($folder in $desktop, $programs) {
+            $link = Get-Item -LiteralPath (Join-Path $folder 'IPTV Desktop.lnk') -ErrorAction Stop
+            $shell.CreateShortcut($link.FullName).TargetPath
+          }
+          $expected = (Get-FileHash 'dist/signpath/win-unpacked/IPTV Desktop.exe').Hash
+          foreach ($target in $targets) {
+            if ((Get-FileHash -LiteralPath $target -ErrorAction Stop).Hash -ne $expected) {
+              throw 'A shortcut does not target the signed application.'
+            }
+          }
+      - name: Upload verified release files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: signed-windows-release
+          path: dist/signpath/release/*
           if-no-files-found: error
 
-  release:
-    needs: build
+  draft-release:
+    needs: sign-windows
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: IPTV-Desktop-portable
-          path: dist
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v1.0.3.4
-          name: IPTV Desktop 1.0.3 (build 4)
-          body: |
-            v1.0.3 — ffmpeg MPEG-2 transcode, TV quality, channel arrange, YouTube in-app, logo tiles, custom title bar, size wins. Portable exe, no install needed.
-            Live TV (109 channels) + Movies/Series, same TV style as the Android app.
-          files: dist/IPTV-Desktop-portable.exe
+          name: signed-windows-release
+          path: release
+      - name: Create GitHub release draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.sign-windows.outputs.version }}
+        run: |
+          setup="release/IPTV-Desktop-Setup-$VERSION.exe"
+          gh release create "v$VERSION" --draft --verify-tag --generate-notes \
+            --notes "Free code signing provided by SignPath.io, certificate by SignPath Foundation. [Code signing policy](https://github.com/$GH_REPO#code-signing-policy)." \
+            --title "IPTV Desktop $VERSION" "$setup" "$setup.blockmap" release/latest.yml
