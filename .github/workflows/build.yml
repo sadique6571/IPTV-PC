@@ -33,9 +33,9 @@ jobs:
           path: dist
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.2.3
-          name: IPTV Desktop 1.0.2 (build 3)
+          tag_name: v1.0.3.4
+          name: IPTV Desktop 1.0.3 (build 4)
           body: |
-            v1.0.2 — Android icon, draggable divider, HLS recovery, list hide, glass player bar, Geo Super MPEG-2 notice. Portable exe, no install needed.
+            v1.0.3 — ffmpeg MPEG-2 transcode, TV quality, channel arrange, YouTube in-app, logo tiles, custom title bar, size wins. Portable exe, no install needed.
             Live TV (109 channels) + Movies/Series, same TV style as the Android app.
           files: dist/IPTV-Desktop-portable.exe
