@@ -1312,13 +1312,46 @@ function releaseNotesText(source) {
   // Template contents stay inert. Only plain text is copied into the dialog.
   const template = document.createElement('template');
   template.innerHTML = source;
+  if (/&lt;\/?(?:p|ol|ul|li|h[1-6])\b/i.test(source) && !template.content.childElementCount) {
+    template.innerHTML = template.content.textContent;
+  }
   const content = template.content;
   content.querySelectorAll('script,style,template,iframe,svg').forEach(node => node.remove());
-  content.querySelectorAll('li').forEach(item => item.prepend('• '));
+  content.querySelectorAll('li').forEach(item => {
+    const list = item.parentElement;
+    item.prepend(list?.tagName === 'OL' ? (Array.from(list.children).indexOf(item) + 1) + '. ' : '• ');
+  });
   content.querySelectorAll('br,li').forEach(node => node.after('\n'));
   content.querySelectorAll('p,ul,ol,pre,h1,h2,h3,h4,h5,h6,div').forEach(node => node.after('\n\n'));
   return content.textContent.replace(/\r\n?/g, '\n').replace(/\n[ \t]+\n/g, '\n\n')
     .replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function renderReleaseNotes(box, source) {
+  box.replaceChildren();
+  let sections, details, section;
+  const text = releaseNotesText(source).split(/^\s*code signing policy\b/im)[0];
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (!line || /\bREADME(?:\.md)?\b/i.test(line)) continue;
+    if (/^\d+[.)]\s+/.test(line)) {
+      if (!sections) sections = box.appendChild(document.createElement('ol'));
+      section = sections.appendChild(document.createElement('li'));
+      section.appendChild(document.createElement('strong')).textContent = line.replace(/^\d+[.)]\s+/, '');
+      details = null;
+    } else if (/^[•*-]\s+/.test(line)) {
+      if (!details) details = (section || box).appendChild(document.createElement('ul'));
+      details.appendChild(document.createElement('li')).textContent = line.slice(1).trimStart();
+    } else {
+      box.appendChild(document.createElement('p')).textContent = line;
+      sections = details = section = null;
+    }
+  }
+  if (box.childElementCount) {
+    const title = document.createElement('h3');
+    title.textContent = 'Is update mein kya naya hai?';
+    box.prepend(title);
+  }
 }
 
 function showUpdateDialog(update) {
@@ -1327,7 +1360,7 @@ function showUpdateDialog(update) {
   const ready = downloadedTag === update.tag;
   $('updText').textContent = `Naya version aa gaya hai (${update.tag}).`;
   const notes = $('updNotes');
-  notes.textContent = releaseNotesText(update.notes || '');
+  renderReleaseNotes(notes, update.notes || '');
   notes.scrollTop = 0;
   notes.classList.toggle('hidden', !notes.textContent);
   $('updProgress').classList.add('hidden');

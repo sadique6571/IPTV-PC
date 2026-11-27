@@ -26,7 +26,7 @@ jobs:
       - run: node scripts/prepare-ffmpeg.js win
       - name: Package x64 Setup for SSH signing
         run: |
-          node -e "const {build,Platform,Arch}=require('electron-builder'); build({targets:Platform.WINDOWS.createTarget(['nsis'],Arch.x64),publish:'never',config:{win:{forceCodeSigning:false},extraMetadata:{updateSigning:'ssh'}}}).catch(e=>{console.error(e);process.exitCode=1})"
+          node -e "const {build,Platform,Arch}=require('electron-builder'); build({targets:Platform.WINDOWS.createTarget(['nsis'],Arch.x64),publish:'never',config:{win:{forceCodeSigning:false},extraMetadata:{updateSigning:'ssh'},releaseInfo:{releaseNotes:require('fs').readFileSync('release-notes/'+require('./package.json').version+'.txt','utf8').trim()}}}).catch(e=>{console.error(e);process.exitCode=1})"
       - name: Smoke-test installation and shortcuts
         shell: pwsh
         run: |

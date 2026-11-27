@@ -1,0 +1,5 @@
+1. Update box
+• Tabdeeliyan ab headings, numbering aur bullet points ke saath dikhti hain.
+• Lambi lines box ke andar wrap hoti hain.
+2. Release ki maloomat
+• Update box mein sirf is version ki tabdeeliyan dikhti hain.
