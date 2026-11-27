@@ -5,6 +5,10 @@ const path = require('node:path');
 const { app } = require('electron');
 const { verifySamePublisher } = require('./windows-signature');
 
+const { fetchSetupSignature, verifySetupSignature } = require('./ssh-signature');
+const sshUpdates = require('../package.json').updateSigning === 'ssh';
+let verifiedSignature;
+
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 let client;
 let checkPromise;
@@ -83,7 +87,13 @@ async function downloadUpdate(tag, onProgress) {
         await updater.downloadUpdate();
         const installerPath = updater.installerPath;
         if (!installerPath) throw new Error('The update installer was not downloaded.');
-        await verifySamePublisher(process.execPath, installerPath);
+        if (sshUpdates) {
+          const signature = await fetchSetupSignature(tag);
+          await verifySetupSignature(installerPath, signature);
+          verifiedSignature = signature;
+        } else {
+          await verifySamePublisher(process.execPath, installerPath);
+        }
         readyPath = installerPath;
       } finally {
         updater.removeListener('download-progress', progress);
@@ -101,7 +111,8 @@ async function installUpdate() {
   if (installing) return;
   installing = true;
   try {
-    await verifySamePublisher(process.execPath, readyPath);
+    if (sshUpdates) await verifySetupSignature(readyPath, verifiedSignature);
+    else await verifySamePublisher(process.execPath, readyPath);
     updater.quitAndInstall(true, true);
   } catch (error) {
     installing = false;

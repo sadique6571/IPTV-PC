@@ -679,7 +679,7 @@ async function playWebChannel(ch, source) {
     let videoId;
     try {
       const result = await window.api.resolveYouTubeLive(source.liveUrl);
-      videoId = ch.group === 'Sports' && !result?.isLive ? null : result?.videoId;
+      videoId = result?.isLive ? result.videoId : null;
     } catch (error) { console.warn('YouTube live:', error.message); }
     if (selection !== ytSelection) return;
     const handle = new URL(source.liveUrl).pathname.match(/^\/@([^/]+)/)?.[1].toLowerCase();
@@ -846,6 +846,7 @@ $('winMax').onclick = () => window.api.toggleMaximizeWindow();
 $('winClose').onclick = () => window.api.closeWindow();
 // Maximise/restore icon follows the real window state.
 const setMaxIcon = (maximized) => {
+  document.documentElement.classList.toggle('maximized', maximized);
   $('winMax').textContent = maximized ? '❐' : '▢';
   $('winMax').title = maximized ? 'Restore' : 'Maximise';
 };
@@ -1372,7 +1373,7 @@ $('updDownload').onclick = async () => {
 };
 window.api.onUpdateProgress((pct) => {
   $('updBar').value = pct;
-  $('updPct').textContent = `Download ho raha hai… ${pct}%`;
+  $('updPct').textContent = pct >= 100 ? 'Download mukammal. Signature check ho rahi hai…' : `Download ho raha hai… ${pct}%`;
 });
 window.api.onUpdateAvailable((update) => showUpdateDialog(update));
 $('checkUpdate').onclick = async () => {

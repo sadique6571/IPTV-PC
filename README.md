@@ -7,13 +7,10 @@ Source and Windows releases are hosted on GitHub.
 ## What it is
 
 - **Live TV** — the built-in playlist includes Pakistani channels, Indian
-  music and selected Hindi kids' cartoons, and English-language cricket.
+  music, live kids channels and the Pakistani sports lineup from the mobile app.
   Categories, search, favorites, and custom M3U playlists are supported.
-  HLS and raw MPEG-TS play with hls.js and mpegts.js. YouTube video and
-  playlist entries use the embedded player. Cricket Gold uses the native
-  HLS player. European Cricket Network and Cricket Ireland use the embedded
-  YouTube player when a live broadcast is available. Cricket entries with
-  no in-app feed show their availability in the app.
+  HLS and raw MPEG-TS play with hls.js and mpegts.js. YouTube live
+  channel feeds use the embedded player. Sports includes A Sports HD, Geo Super, PTV Sports HD and Ten Sports Pakistan.
 - **Movies / Series** — the same MovieBox source as the Android app:
   visitor login + HMAC-MD5 signed mobile API (search, details, seasons),
   playable MP4s from `resourceDetectors` / `play-info/v2` and the website
@@ -49,12 +46,7 @@ or `WIN_CSC_LINK` before building.
 
 ## Code signing policy
 
-SignPath Foundation signing is planned, pending approval. The
-GitHub-hosted release workflow signs the app and Setup EXE separately,
-verifies both signatures, and creates a draft release with the matching
-update metadata. Sadique Sadiq (@sadique6571) maintains the project,
-reviews changes, and approves signing requests. See the
-[SignPath application and release setup](docs/signpath-application.md).
+Sadique Sadiq signs the public Windows Setup EXE with a detached Ed25519 SSH signature. GitHub Actions verifies the installer against the project public key before handing it to the release maintainer. Windows can display Unknown publisher. In-app updates require Windows OpenSSH Client and verify the pinned key before installation. The SignPath Foundation declined the initial application.
 
 ## Project layout
 
@@ -72,7 +64,7 @@ src/
     channels.js         M3U parser
     vendor/             hls.min.js, mpegts.js (copied from node_modules)
 assets/
-  channels.m3u          Built-in TV, music, kids' cartoons, and cricket sources
+  channels.m3u          Built-in TV, music, live kids and sports channels
 docs/
   moviebox-api.md       Exhaustive MovieBox API spec (from the Kotlin source)
   ui-spec.md            Android UI/design spec (colors, layout, player bar)

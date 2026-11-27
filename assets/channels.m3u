@@ -111,27 +111,13 @@ http://175.107.244.52:4456/play/a06h/index.m3u8
 http://175.107.244.52:4456/play/a02z
 #EXTINF:-1 group-title="Music" tvg-country="PK" tvg-language="urd" tvg-logo="https://i.imgur.com/HWb5Iat.png",Jalwa TV
 http://116.90.120.149:8000/play/a0tv/index.m3u8
-#EXTINF:-1 group-title="Kids" tvg-country="IN" tvg-language="hin",Nickelodeon India - Abhimanyu (Hindi clip)
-https://www.youtube.com/watch?v=4-zS4QBVwos
-#EXTINF:-1 group-title="Kids" tvg-country="IN" tvg-language="hin",Motu Patlu - Motu Aur Sher (Hindi episode)
-https://www.youtube.com/watch?v=bv2Jv9WjjKo
-#EXTINF:-1 group-title="Kids" tvg-country="IN" tvg-language="hin",Cartoon Network India - Tom & Jerry (cartoons)
-https://www.youtube.com/playlist?list=PLckQZM6PG6qkeSfQ7kx66nOnpF3WdZgfo
-#EXTINF:-1 group-title="Kids" tvg-country="IN" tvg-language="hin",Sony YAY! - Honey Bunny (Hindi cartoon)
-https://www.youtube.com/watch?v=EKphM-IybT0
-#EXTINF:-1 group-title="Sports" tvg-country="US" tvg-language="eng" tvg-logo="assets/logos/willow.jpg" tvg-type="unavailable",Willow TV (US and Canada) [in-app feed unavailable]
-https://www.willow.tv/
-#EXTINF:-1 group-title="Sports" tvg-country="AU" tvg-language="eng",Cricket Gold
-https://streams2.sofast.tv/ptnr-yupptv/title-cricketgold/v1/master/611d79b11b77e2f571934fd80ca1413453772ac7/b2048bb8-1686-4432-aa50-647245383e0c/manifest.m3u8
-#EXTINF:-1 group-title="Sports" tvg-country="IE" tvg-language="eng",Cricket Ireland (match streams)
-https://www.youtube.com/@CricketIrelandLive/live
-#EXTINF:-1 group-title="Sports" tvg-country="EU" tvg-language="eng",European Cricket Network (match streams)
-https://www.youtube.com/channel/UCzpKcXOP32CxF-X6iTpM7EQ/live
-#EXTINF:-1 group-title="Sports" tvg-country="IN" tvg-language="eng" tvg-type="unavailable",Star Sports 1 HD (Tata Play 454) [in-app feed unavailable]
-https://www.tataplay.com/dth/pack/english-sports-new-hd
-#EXTINF:-1 group-title="Sports" tvg-country="IN" tvg-language="eng" tvg-type="unavailable",Sony Sports Ten 1 HD (Tata Play 470) [in-app feed unavailable]
-https://watch.tataplay.com/live-tv
-#EXTINF:-1 group-title="Sports" tvg-country="GB" tvg-language="eng" tvg-type="unavailable",Sky Sports Cricket (Sky or NOW) [in-app feed unavailable]
-https://www.skysports.com/watch/sky-sports-cricket
-#EXTINF:-1 group-title="Sports" tvg-country="AU" tvg-language="eng" tvg-type="unavailable",Fox Cricket (Foxtel 501) [in-app feed unavailable]
-https://www.foxtel.com.au/watch/cricket.html
+#EXTINF:-1 group-title="Kids" tvg-country="IN" tvg-logo="https://dtil.tmsimg.com/assets/s159100_ld_h15_aa.png",Sony YAY!
+https://r2.amml.in/sony-yay/live.m3u8
+#EXTINF:-1 group-title="Sports" tvg-country="PK" tvg-language="urd" tvg-logo="https://upload.wikimedia.org/wikipedia/en/0/0c/A_Sports_Logo.png",A Sports HD
+https://live.msnetworks.net/a-sports/master.m3u8
+#EXTINF:-1 group-title="Sports" tvg-country="PK" tvg-language="urd" tvg-logo="https://yt3.googleusercontent.com/5E03PY5Ltzf4abr_x9izaRPtNJFhRlLkZadeFP7OzqrGLY8UTDjSkqGH14n52bQROQmidKBhpiE=s176-c-k-c0x00ffffff-no-rj",Geo Super
+http://175.107.244.52:4456/play/a06z
+#EXTINF:-1 group-title="Sports" tvg-country="PK" tvg-language="eng" tvg-logo="https://i.imgur.com/CPm6GHA.png",PTV Sports HD
+https://live.msnetworks.net/ptv-sports/master.m3u8
+#EXTINF:-1 group-title="Sports" tvg-country="PK" tvg-language="eng" tvg-logo="https://i.imgur.com/7qS6TcE.png",Ten Sports Pakistan
+https://live.msnetworks.net/ten-sports/master.m3u8

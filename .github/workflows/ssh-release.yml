@@ -1,0 +1,80 @@
+name: Build and SSH-sign Windows Setup
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Validate version
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          if ($env:GITHUB_REF -cne "refs/tags/v$version") { throw 'Select the matching release tag.' }
+      - run: npm ci
+      - run: node scripts/prepare-ffmpeg.js win
+      - run: npx --no-install electron-builder --win nsis --x64 --publish never -c.win.forceCodeSigning=false -c.extraMetadata.updateSigning=ssh
+      - name: Smoke-test installation and shortcuts
+        shell: pwsh
+        run: |
+          $setup = Get-Item dist/*Setup*.exe
+          $p = Start-Process $setup.FullName -ArgumentList '/S','/currentuser' -Wait -PassThru
+          if ($p.ExitCode) { throw "Setup failed with $($p.ExitCode)" }
+          $expected = (Get-FileHash 'dist/win-unpacked/IPTV Desktop.exe').Hash
+          $shell = New-Object -ComObject WScript.Shell
+          foreach ($folder in 'DesktopDirectory','Programs') {
+            $shortcut = Get-Item (Join-Path ([Environment]::GetFolderPath($folder)) 'IPTV Desktop.lnk')
+            if ((Get-FileHash $shell.CreateShortcut($shortcut.FullName).TargetPath).Hash -ne $expected) { throw "Incorrect $folder shortcut" }
+          }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-setup
+          path: |
+            dist/*Setup*.exe
+            dist/*.blockmap
+            dist/latest.yml
+          if-no-files-found: error
+
+  sign:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          sparse-checkout: src/release-signers
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: windows-setup
+          path: release
+      - name: Sign and verify installer with the pinned SSH public key
+        env:
+          SIGNING_KEY: ${{ secrets.IPTV_SSH_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          key=$(mktemp)
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$SIGNING_KEY" | tr -d '\r' > "$key"
+          unset SIGNING_KEY
+          setup="release/IPTV-Desktop-Setup-${GITHUB_REF_NAME#v}.exe"
+          ssh-keygen -Y sign -f "$key" -n file "$setup"
+          cp src/release-signers release/allowed_signers
+          ssh-keygen -Y verify -f release/allowed_signers -I iptv-desktop -n file -s "$setup.sig" < "$setup"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ssh-signed-release
+          path: release/*
+          if-no-files-found: error

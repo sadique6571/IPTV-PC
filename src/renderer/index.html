@@ -99,12 +99,12 @@
 
   <!-- Update dialog -->
   <div id="updateDialog" class="overlay hidden">
-    <div class="dialog">
-      <div class="dlg-title">⬆ App Update</div>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="updTitle">
+      <div class="dlg-title" id="updTitle"><img src="../../assets/icon.png" alt="">App Update</div>
       <div id="updText" class="dlg-text"></div>
       <div id="updNotes" class="dlg-notes hidden"></div>
       <div id="updProgress" class="hidden">
-        <progress id="updBar" max="100" value="0"></progress>
+        <progress id="updBar" max="100" value="0" aria-label="Update download"></progress>
         <div id="updPct" class="dlg-text">Download ho raha hai… 0%</div>
       </div>
       <div id="updDone" class="dlg-text hidden"></div>

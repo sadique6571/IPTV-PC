@@ -46,6 +46,35 @@ function saveState(state) {
   }
 }
 
+function roundWindowCorners(win) {
+  if (process.platform !== 'win32') return;
+  function updateShape() {
+    if (win.isMinimized()) return;
+    if (win.isMaximized() || win.isFullScreen()) {
+      win.setShape([]);
+      return;
+    }
+    const [width, height] = win.getContentSize();
+    // Electron reports client bounds for a frameless resizable window, but
+    // the Windows region starts at the outer edge of its resize frame.
+    const frameInset = 8;
+    const radius = Math.min(18, Math.floor(Math.min(width, height) / 2));
+    if (!radius) return;
+    const rows = [{ x: frameInset, y: radius, width, height: height - 2 * radius }];
+    for (let y = 0; y < radius; y++) {
+      const dy = radius - y - 0.5;
+      const x = Math.round(radius - Math.sqrt(radius * radius - dy * dy));
+      rows.push({ x: frameInset + x, y, width: width - 2 * x, height: 1 },
+        { x: frameInset + x, y: height - 1 - y, width: width - 2 * x, height: 1 });
+    }
+    win.setShape(rows);
+  }
+  for (const event of ['resize', 'maximize', 'unmaximize', 'restore', 'enter-full-screen', 'leave-full-screen']) {
+    win.on(event, updateShape);
+  }
+  updateShape();
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -75,6 +104,7 @@ function createWindow() {
     },
   });
 
+  roundWindowCorners(mainWindow);
   mainWindow.webContents.once('did-finish-load', () => silentUpdateCheck());
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   mainWindow.on('closed', () => { mainWindow = null; });
