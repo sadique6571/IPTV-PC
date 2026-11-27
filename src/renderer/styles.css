@@ -323,7 +323,10 @@ body.split-dragging, body.split-dragging * { cursor: col-resize !important; }
 .dlg-title { display: flex; align-items: center; gap: 12px; font-size: 21px; font-weight: 650; margin-bottom: 16px; }
 .dlg-title img { width: 36px; height: 36px; border-radius: 9px; }
 .dlg-text { color: var(--muted2); font-size: 15px; line-height: 1.5; }
+#checkUpdate { display: inline-flex; align-items: center; justify-content: center; gap: 7px; white-space: nowrap; }
+#checkUpdate svg { flex: none; color: var(--accent); }
 .dlg-notes { margin-top: 12px; max-height: 180px; overflow-y: auto; white-space: pre-wrap;
+  overflow-wrap: anywhere; line-height: 1.5; scrollbar-color: var(--panel2) var(--bg1); scrollbar-width: thin;
   background: var(--bg1); border-radius: 10px; padding: 10px 12px; }
 .dlg-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .dlg-actions:has(button:not(.hidden)) { margin-top: 20px; }

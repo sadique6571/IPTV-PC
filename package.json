@@ -75,5 +75,5 @@
     "build:win": "node scripts/build-win.js",
     "start": "electron ."
   },
-  "version": "1.0.14"
+  "version": "1.0.15"
 }

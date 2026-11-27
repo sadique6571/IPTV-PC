@@ -1308,16 +1308,28 @@ document.addEventListener('click', (e) => {
 let pendingUpdate = null;
 let downloadedTag = null;
 
+function releaseNotesText(source) {
+  // Template contents stay inert. Only plain text is copied into the dialog.
+  const template = document.createElement('template');
+  template.innerHTML = source;
+  const content = template.content;
+  content.querySelectorAll('script,style,template,iframe,svg').forEach(node => node.remove());
+  content.querySelectorAll('li').forEach(item => item.prepend('• '));
+  content.querySelectorAll('br,li').forEach(node => node.after('\n'));
+  content.querySelectorAll('p,ul,ol,pre,h1,h2,h3,h4,h5,h6,div').forEach(node => node.after('\n\n'));
+  return content.textContent.replace(/\r\n?/g, '\n').replace(/\n[ \t]+\n/g, '\n\n')
+    .replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function showUpdateDialog(update) {
   if (pendingUpdate?.tag === update.tag) return;
   pendingUpdate = update;
   const ready = downloadedTag === update.tag;
   $('updText').textContent = `Naya version aa gaya hai (${update.tag}).`;
   const notes = $('updNotes');
-  if (update.notes && update.notes.trim()) {
-    notes.textContent = update.notes.trim().slice(0, 2000);
-    notes.classList.remove('hidden');
-  } else notes.classList.add('hidden');
+  notes.textContent = releaseNotesText(update.notes || '');
+  notes.scrollTop = 0;
+  notes.classList.toggle('hidden', !notes.textContent);
   $('updProgress').classList.add('hidden');
   $('updDone').classList.toggle('hidden', !ready);
   $('updDownload').classList.toggle('hidden', ready);
