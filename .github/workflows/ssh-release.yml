@@ -24,7 +24,9 @@ jobs:
           if ($env:GITHUB_REF -cne "refs/tags/v$version") { throw 'Select the matching release tag.' }
       - run: npm ci
       - run: node scripts/prepare-ffmpeg.js win
-      - run: npx --no-install electron-builder --win nsis --x64 --publish never -c.win.forceCodeSigning=false -c.extraMetadata.updateSigning=ssh
+      - name: Package x64 Setup for SSH signing
+        run: |
+          node -e "const {build,Platform,Arch}=require('electron-builder'); build({targets:Platform.WINDOWS.createTarget(['nsis'],Arch.x64),publish:'never',config:{win:{forceCodeSigning:false},extraMetadata:{updateSigning:'ssh'}}}).catch(e=>{console.error(e);process.exitCode=1})"
       - name: Smoke-test installation and shortcuts
         shell: pwsh
         run: |
