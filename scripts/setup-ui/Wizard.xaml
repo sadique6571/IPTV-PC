@@ -13,11 +13,11 @@
     <Style x:Key="WindowButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Width" Value="34"/><Setter Property="Height" Value="34"/><Setter Property="Margin" Value="4,0,0,0"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="#284059"/><Setter Property="BorderBrush" Value="#486179"/></Style>
     <Style TargetType="TextBlock"><Setter Property="TextWrapping" Value="Wrap"/></Style>
   </Window.Resources>
-  <Border x:Name="Frame" CornerRadius="18" BorderBrush="#546983" BorderThickness="1">
-    <Grid><Grid.Background><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#091120"/><GradientStop Color="#101E32" Offset=".55"/><GradientStop Color="#202947" Offset="1"/></LinearGradientBrush></Grid.Background>
-      <Grid IsHitTestVisible="False"><Grid.Background><RadialGradientBrush Center=".93,.04" GradientOrigin=".93,.04" RadiusX=".65" RadiusY=".75"><GradientStop Color="#6031C6D5"/><GradientStop Color="#0022D9EE" Offset="1"/></RadialGradientBrush></Grid.Background></Grid>
-      <Grid IsHitTestVisible="False"><Grid.Background><RadialGradientBrush Center=".02,.95" GradientOrigin=".02,.95" RadiusX=".65" RadiusY=".7"><GradientStop Color="#703D7BFF"/><GradientStop Color="#003D7BFF" Offset="1"/></RadialGradientBrush></Grid.Background></Grid>
-      <Grid Margin="12,10"><Grid.RowDefinitions><RowDefinition Height="56"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Grid x:Name="Frame">
+    <Border CornerRadius="18"><Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#091120"/><GradientStop Color="#101E32" Offset=".55"/><GradientStop Color="#202947" Offset="1"/></LinearGradientBrush></Border.Background></Border>
+      <Border CornerRadius="18" IsHitTestVisible="False"><Border.Background><RadialGradientBrush Center=".93,.04" GradientOrigin=".93,.04" RadiusX=".65" RadiusY=".75"><GradientStop Color="#6031C6D5"/><GradientStop Color="#0022D9EE" Offset="1"/></RadialGradientBrush></Border.Background></Border>
+      <Border CornerRadius="18" IsHitTestVisible="False"><Border.Background><RadialGradientBrush Center=".02,.95" GradientOrigin=".02,.95" RadiusX=".65" RadiusY=".7"><GradientStop Color="#703D7BFF"/><GradientStop Color="#003D7BFF" Offset="1"/></RadialGradientBrush></Border.Background></Border>
+      <Grid Margin="13,11"><Grid.RowDefinitions><RowDefinition Height="56"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <Border x:Name="Header" CornerRadius="20" BorderBrush="#6198BC" BorderThickness="1" Padding="16,0"><Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#425F80"/><GradientStop Color="#294464" Offset="1"/></LinearGradientBrush></Border.Background>
           <DockPanel LastChildFill="False"><StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Image x:Name="Logo" Width="32" Height="32" Margin="0,0,10,0"/><TextBlock Text="IPTV" FontSize="26" FontWeight="Bold"/><TextBlock Text="Setup" Foreground="#BECFE4" VerticalAlignment="Center" Margin="10,3,0,0"/></StackPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><Button x:Name="Min" Style="{StaticResource WindowButton}" Content="—" ToolTip="Minimise" AutomationProperties.Name="Minimise"/><Button x:Name="Max" Style="{StaticResource WindowButton}" Content="▢" ToolTip="Maximise" AutomationProperties.Name="Maximise"/><Button x:Name="CloseBtn" Content="✕" ToolTip="Close" AutomationProperties.Name="Close"><Button.Style><Style TargetType="Button" BasedOn="{StaticResource WindowButton}"><Style.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="#E81123"/></Trigger></Style.Triggers></Style></Button.Style></Button></StackPanel>
@@ -32,6 +32,8 @@
           <ProgressBar x:Name="Progress" Visibility="Collapsed" IsIndeterminate="True" Height="5" Foreground="#22D9EE" Background="#23374D"/>
         </StackPanel></Grid></Border>
         <DockPanel Grid.Row="2" Margin="6,0,6,4" LastChildFill="False"><Button x:Name="Back" Content="Back"/><Button x:Name="Next" DockPanel.Dock="Right" MinWidth="104" FontWeight="SemiBold" Background="{StaticResource Accent}" Foreground="#081322"/><Button x:Name="Secondary" DockPanel.Dock="Right" Content="Cancel" Margin="0,0,8,0"/></DockPanel>
-      </Grid></Grid>
-  </Border>
+      </Grid>
+      <!-- Paint the outline last, just inside the native rounded window region. -->
+      <Border x:Name="Outline" Margin="1" CornerRadius="17" BorderBrush="#546983" BorderThickness="1" IsHitTestVisible="False"/>
+  </Grid>
 </Window>

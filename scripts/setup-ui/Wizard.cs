@@ -61,7 +61,8 @@ internal sealed class Wizard {
             Button("Max").Content = max ? "❐" : "▢";
             Button("Max").ToolTip = max ? "Restore" : "Maximise";
             System.Windows.Automation.AutomationProperties.SetName(Button("Max"), (string)Button("Max").ToolTip);
-            Find<Border>("Frame").Padding = new Thickness(max ? 8 : 0);
+            Find<Grid>("Frame").Margin = new Thickness(max ? 8 : 0);
+            Find<Border>("Outline").Visibility = max ? Visibility.Collapsed : Visibility.Visible;
         };
         window.Closing += delegate(object sender, CancelEventArgs e) { e.Cancel = page == Page.Installing; };
         Button("Back").Click += delegate { Show(page == Page.Review ? Page.Location : Page.Welcome); };
