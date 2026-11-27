@@ -1,4 +1,4 @@
-# IPTV Desktop
+# IPTV Desktop 1.1.0
 
 Live TV, movies and series on the computer — the same TV style as the
 Android IPTV app, for **Windows first** (Linux later from the same code).
@@ -16,6 +16,11 @@ Source and Windows releases are hosted on GitHub.
   playable MP4s from `resourceDetectors` / `play-info/v2` and the website
   H5 endpoint (the proven path for titles like The Body [Hindi]),
   English subtitles from the caption endpoint, Continue Watching.
+- **Movie downloads** — open a movie in **Movies & Series**, click
+  **Download**, then pick one of the qualities available for that title.
+  The Windows **Save As** dialog opens in Downloads with the movie title
+  filled in as the MP4 filename. You can change the name or folder.
+  The download box shows progress and lets you cancel the transfer.
 - **Player** — one player for TV and movies: play/pause, −10s/+10s, seek
   bar, quality menu, CC toggle, Prev/Next episode, fullscreen.
 - **In-app updater** — installed Windows builds check GitHub on startup
@@ -193,5 +198,5 @@ for bundled components and artwork.
   slow; the other rails still load.
 - **No Xtream support yet** (the Android app has it; desktop v1 has
   built-in + M3U playlists only).
-- **No downloads** (the Android app downloads movies; desktop v1 is
-  streaming only).
+- Offline saving is available for movies with a direct MP4 source.
+  Series episodes and live channels support playback only.

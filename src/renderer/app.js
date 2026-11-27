@@ -1109,6 +1109,7 @@ function renderDetails(d, resume) {
     ${d.overview ? `<div class="d-desc">${esc(d.overview)}</div>` : ''}
     <div class="actions">
       <button class="btn primary" id="dPlay">▶ Play${isSeries ? ' S' + selectedSeason + ' E1' : ''}</button>
+      ${isSeries ? '' : '<button class="btn" id="dDownload">Download</button>'}
       <button class="btn" id="dFav">${d.isFav ? '★ Favorited' : '☆ Favorite'}</button>
       <button class="btn" id="dBack">← Back</button>
     </div>
@@ -1117,6 +1118,7 @@ function renderDetails(d, resume) {
       <div class="ep-grid">${eps.map((ep) => `<button class="ep-btn ${ep.watched ? 'watched' : ''}" data-ep="${ep.number}">${ep.number}</button>`).join('')}</div>
     ` : ''}`;
   dv.querySelector('#dBack').onclick = () => backToMoviesHome();
+  if (!isSeries) dv.querySelector('#dDownload').onclick = () => openMovieDownload(d);
   dv.querySelector('#dFav').onclick = (e) => {
     d.isFav = !d.isFav;
     e.target.textContent = d.isFav ? '★ Favorited' : '☆ Favorite';
@@ -1138,6 +1140,77 @@ function renderDetails(d, resume) {
     b.onclick = () => playEpisode(d, selectedSeason, Number(b.dataset.ep));
   });
 }
+const movieDialog = $('movieDownload');
+let movieDialogSession = 0;
+let movieSaving = false;
+
+function closeMovieDownload() {
+  if (movieSaving) {
+    $('movieDownloadClose').disabled = true;
+    window.api.cancelMovie();
+    return;
+  }
+  movieDialogSession++;
+  movieDialog.close();
+}
+$('movieDownloadClose').onclick = closeMovieDownload;
+movieDialog.oncancel = event => { event.preventDefault(); closeMovieDownload(); };
+window.api.onMovieProgress(({ received, total }) => {
+  const bar = $('movieDownloadBar');
+  bar.classList.remove('hidden');
+  if (total > 0) {
+    bar.max = total;
+    bar.value = received;
+  } else bar.removeAttribute('value');
+  $('movieDownloadStatus').textContent = total
+    ? 'Downloading… ' + Math.floor(received * 100 / total) + '%'
+    : 'Downloading… ' + (received / 1048576).toFixed(1) + ' MB';
+});
+
+async function openMovieDownload(movie) {
+  const session = ++movieDialogSession;
+  const options = $('downloadQualities'), status = $('movieDownloadStatus'), close = $('movieDownloadClose');
+  options.replaceChildren();
+  $('downloadTitle').textContent = movie.title;
+  $('movieDownloadBar').classList.add('hidden');
+  close.disabled = false;
+  close.textContent = 'Cancel';
+  status.textContent = 'Looking for available qualities…';
+  movieDialog.showModal();
+  try {
+    const labels = await window.api.movieQualities({ subjectId: movie.subjectId, se: 0, ep: 0, detailPath: movie.detailPath });
+    if (session !== movieDialogSession) return;
+    status.textContent = labels.length ? 'Select download quality' : 'No downloadable quality is available for this movie.';
+    labels.forEach((label, index) => {
+      const button = document.createElement('button');
+      button.className = 'btn';
+      button.textContent = label;
+      button.onclick = async () => {
+        if (movieSaving) return;
+        movieSaving = true;
+        options.replaceChildren();
+        status.textContent = 'Choose where to save the movie…';
+        try {
+          const result = await window.api.saveMovie(index, movie.title);
+          status.textContent = result.canceled ? 'Download canceled.' : 'Saved · ' + result.name;
+        } catch {
+          status.textContent = 'Download failed. Check your connection and save location, then try again.';
+        } finally {
+          movieSaving = false;
+          close.disabled = false;
+          close.textContent = 'Close';
+          $('movieDownloadBar').classList.add('hidden');
+          close.focus();
+        }
+      };
+      options.append(button);
+    });
+    options.firstElementChild?.focus();
+  } catch {
+    if (session === movieDialogSession) status.textContent = 'Could not load download qualities. Please try again.';
+  }
+}
+
 function backToMoviesHome() {
   $('detailsView').classList.add('hidden');
   $('movieResults').classList.add('hidden');
@@ -1266,6 +1339,7 @@ function moveFocus(delta) {
   rows[focusIndex].scrollIntoView({ block: 'nearest' });
 }
 document.addEventListener('keydown', (e) => {
+  if (movieDialog.open) return;
   const inInput = /INPUT|TEXTAREA/.test(document.activeElement.tagName);
   if (e.key === 'Escape') {
     if (!$('popupMenu').classList.contains('hidden')) { closePopup(); return; }

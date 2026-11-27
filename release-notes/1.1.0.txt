@@ -1,0 +1,5 @@
+1. Movie downloads
+• Movies & Series mein movie khol kar Download par click karein aur quality chunein.
+• Save As mein movie ka naam pehle se likha hoga. Naam aur folder badal sakte hain.
+2. Download progress
+• Download box mein progress dekhein ya transfer cancel karein.

@@ -101,6 +101,15 @@
     </section>
   </main>
 
+  <dialog id="movieDownload" class="dialog" aria-labelledby="movieDownloadHeading">
+    <h2 id="movieDownloadHeading" class="dlg-title"><img src="../../assets/icon.png" alt="">Download movie</h2>
+    <strong id="downloadTitle"></strong>
+    <p id="movieDownloadStatus" class="dlg-text" role="status"></p>
+    <div id="downloadQualities"></div>
+    <progress id="movieDownloadBar" class="hidden" aria-label="Movie download"></progress>
+    <div class="dlg-actions"><button id="movieDownloadClose" class="btn">Cancel</button></div>
+  </dialog>
+
   <!-- Update dialog -->
   <div id="updateDialog" class="overlay hidden">
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="updTitle">

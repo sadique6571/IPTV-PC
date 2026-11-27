@@ -11,6 +11,7 @@ const fs = require('fs');
 const { pathToFileURL } = require('url');
 
 const moviebox = require('./moviebox');
+const { defaultName, saveMovie } = require('./movie-download');
 const updater = require('./updater');
 const transcode = require('./transcode');
 const youtube = require('./youtube');
@@ -298,5 +299,53 @@ ipcMain.handle('media:setHeaders', (_e, h) => {
 ipcMain.handle('mb:search', (_e, q) => moviebox.search(q));
 ipcMain.handle('mb:details', (_e, subjectId) => moviebox.getDetails(subjectId));
 ipcMain.handle('mb:play', (_e, args) => moviebox.getPlayStreams(args));
+let downloadChoices = [];
+let qualityLookup = 0;
+let movieTransfer;
+function isAppFrame(event) {
+  return mainWindow && event.sender === mainWindow.webContents &&
+    event.senderFrame === event.sender.mainFrame &&
+    event.senderFrame.url === pathToFileURL(path.join(__dirname, 'renderer', 'index.html')).href;
+}
+ipcMain.handle('movie:qualities', async (event, args) => {
+  if (!isAppFrame(event)) throw new Error('Invalid window');
+  const lookup = ++qualityLookup;
+  const result = await moviebox.getPlayStreams(args);
+  if (lookup !== qualityLookup) return [];
+  downloadChoices = (result.sources || []).filter(source =>
+    /^https?:\/\//i.test(source.url) && !/\.(m3u8|mpd)(?:[?#]|$)/i.test(source.url));
+  return downloadChoices.map(source => source.label);
+});
+ipcMain.handle('movie:save', async (event, index, title) => {
+  const source = downloadChoices[index];
+  if (!isAppFrame(event) || !Number.isInteger(index) || !source || movieTransfer) {
+    throw new Error('Download unavailable');
+  }
+  const owner = mainWindow;
+  const controller = new AbortController();
+  movieTransfer = controller;
+  const abort = () => controller.abort();
+  owner.once('closed', abort);
+  try {
+    const { canceled, filePath } = await dialog.showSaveDialog(owner, {
+      title: 'Save movie as', defaultPath: path.join(app.getPath('downloads'), defaultName(title)),
+      filters: [{ name: 'MP4 video', extensions: ['mp4'] }],
+    });
+    if (canceled || !filePath) return { canceled: true };
+    const progress = (received, total) => {
+      if (!owner.isDestroyed()) owner.webContents.send('movie:progress', { received, total });
+    };
+    progress(0, 0);
+    await saveMovie(source, filePath, controller.signal, progress);
+    return { name: path.basename(filePath) };
+  } catch (error) {
+    if (controller.signal.aborted) return { canceled: true };
+    throw error;
+  } finally {
+    owner.removeListener('closed', abort);
+    movieTransfer = null;
+  }
+});
+ipcMain.handle('movie:cancel', event => { if (isAppFrame(event)) movieTransfer?.abort(); });
 ipcMain.handle('mb:captions', (_e, args) => moviebox.getEnglishCaptions(args));
 ipcMain.handle('mb:feed', (_e, args) => moviebox.getFeed(args || {}));

@@ -16,6 +16,10 @@ contextBridge.exposeInMainWorld('api', {
   setMediaHeaders: (h) => ipcRenderer.invoke('media:setHeaders', h),
   mbDetails: (subjectId) => ipcRenderer.invoke('mb:details', subjectId),
   mbPlay: (args) => ipcRenderer.invoke('mb:play', args),
+  movieQualities: args => ipcRenderer.invoke('movie:qualities', args),
+  saveMovie: (index, title) => ipcRenderer.invoke('movie:save', index, title),
+  cancelMovie: () => ipcRenderer.invoke('movie:cancel'),
+  onMovieProgress: cb => ipcRenderer.on('movie:progress', (_event, progress) => cb(progress)),
   mbCaptions: (args) => ipcRenderer.invoke('mb:captions', args),
   mbFeed: (args) => ipcRenderer.invoke('mb:feed', args),
   // YouTube live: resolve the current live video ID at play time.
