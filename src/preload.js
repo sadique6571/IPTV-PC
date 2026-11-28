@@ -12,7 +12,7 @@ contextBridge.exposeInMainWorld('api', {
   bundledChannels: () => ipcRenderer.invoke('channels:bundled'),
   openM3U: () => ipcRenderer.invoke('dialog:openM3U'),
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
-  mbSearch: (q) => ipcRenderer.invoke('mb:search', q),
+  mbSearch: (q, known) => ipcRenderer.invoke('mb:search', q, known),
   setMediaHeaders: (h) => ipcRenderer.invoke('media:setHeaders', h),
   mbDetails: (subjectId) => ipcRenderer.invoke('mb:details', subjectId),
   mbPlay: (args) => ipcRenderer.invoke('mb:play', args),
@@ -28,6 +28,9 @@ contextBridge.exposeInMainWorld('api', {
   startTranscode: (url) => ipcRenderer.invoke('transcode:start', url),
   stopTranscode: () => ipcRenderer.invoke('transcode:stop'),
   transcodeStatus: () => ipcRenderer.invoke('transcode:status'),
+  startLiveBuffer: options => ipcRenderer.invoke('live-buffer:start', options),
+  stopLiveBuffer: () => ipcRenderer.invoke('live-buffer:stop'),
+  liveBufferStatus: () => ipcRenderer.invoke('live-buffer:status'),
   // Custom title bar (frameless window): window controls.
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
   toggleMaximizeWindow: () => ipcRenderer.invoke('window:maximize-toggle'),

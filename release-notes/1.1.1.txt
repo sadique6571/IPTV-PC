@@ -1,0 +1,12 @@
+1. Live TV pause aur resume
+• Supported HLS channels ke liye ek ghante tak ka live buffer aur Go Live button.
+• Status bar mein media transfer speed aur data usage.
+
+2. Player aur layout
+• Fullscreen mein centered player bar, gol Play/Pause aur automatic hide.
+• Chhoti window mein do rows ke controls, themed menus aur dialogs.
+
+3. Movies & Series
+• Spelling mistakes aur related titles ke liye behtar search.
+• Hindi results pehle. Ek jaisi relevance aur language priority mein newest release upar.
+• Movie details mein Play, Retry aur Continue Watching ki improvements.
