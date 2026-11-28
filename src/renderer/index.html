@@ -15,6 +15,7 @@
       <button class="tab" data-tab="movies" role="tab">Movies &amp; Series</button>
     </nav>
     <div class="top-right">
+      <div id="headerActions">
       <button id="toggleList" class="pill" title="List chhupao / dikhao (L)">☰ List chhupao</button>
       <button id="openM3U" class="pill" title="Load a playlist file (.m3u)">Open M3U</button>
       <button id="checkUpdate" class="pill" title="Check for updates">
@@ -22,7 +23,15 @@
           <path d="M20 8a8.5 8.5 0 0 0-14.7-2L3 9m0-5v5h5M4 16a8.5 8.5 0 0 0 14.7 2l2.3-3m0 5v-5h-5"/>
         </svg>Check for updates
       </button>
+      </div>
+      <span id="network" class="clock" title="Media transfer speed and data used">0.0 Mbps / 0 MB</span>
       <span id="clock" class="clock"></span>
+      <button id="headerMore" class="win-btn" aria-label="More options" aria-expanded="false">⋮</button>
+      <div id="headerMenu" class="popup hidden">
+        <button class="p-item" data-button="toggleList">Toggle list</button>
+        <button class="p-item" data-button="openM3U">Open M3U</button>
+        <button class="p-item" data-button="checkUpdate">Check for updates</button>
+      </div>
       <div class="win-controls" role="group" aria-label="Window controls">
         <button id="winMin" class="win-btn" title="Minimise">—</button>
         <button id="winMax" class="win-btn" title="Maximise">▢</button>
@@ -83,23 +92,38 @@
           <button id="btnOpenExternal" class="btn primary">VLC mein kholo</button>
         </div>
         <div id="playerBar">
+          <div class="transport">
           <button id="btnPlay" class="disc" title="Play / Pause (Space)">▶</button>
-          <button id="btnBack10" class="chip-btn" title="Back 10s (←)">−10</button>
-          <button id="btnFwd10" class="chip-btn" title="Forward 10s (→)">+10</button>
-          <input id="seek" type="range" min="0" max="1000" value="0" step="1">
+          <button id="btnBack10" class="chip-btn step-btn" title="Back 10s (←)">−10</button>
+          <button id="btnFwd10" class="chip-btn step-btn" title="Forward 10s (→)">+10</button>
+          <input id="seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Playback position">
           <span id="timeRead" class="time">0:00 / 0:00</span>
+          </div>
+          <div class="player-options">
           <button id="btnPrev" class="chip-btn" title="Previous episode">Prev</button>
           <button id="btnNext" class="chip-btn" title="Next episode">Next</button>
+          <button id="btnAudio" class="chip-btn hidden" title="Audio tracks">Audio</button>
           <button id="btnCC" class="chip-btn" title="English subtitles">CC</button>
           <button id="btnQuality" class="chip-btn" title="Quality">Quality</button>
+          <button id="btnLive" class="chip-btn hidden" title="Return to live">Go Live</button>
           <button id="btnFull" class="chip-btn" title="Fullscreen (F)">⛶</button>
+          </div>
         </div>
         <div id="popupMenu" class="popup hidden"></div>
         <div id="toast" class="toast hidden"></div>
+        <div id="upNext" class="up-next hidden"></div>
       </div>
-      <div id="upNext" class="up-next hidden"></div>
     </section>
   </main>
+
+  <dialog id="removeContinue" class="dialog" aria-labelledby="removeContinueHeading">
+    <h2 id="removeContinueHeading" class="dlg-title">Remove from Continue Watching?</h2>
+    <p id="removeContinueTitle" class="dlg-text"></p>
+    <form method="dialog" class="dlg-actions">
+      <button class="btn" value="cancel" autofocus>Cancel</button>
+      <button class="btn primary" value="remove">Remove</button>
+    </form>
+  </dialog>
 
   <dialog id="movieDownload" class="dialog" aria-labelledby="movieDownloadHeading">
     <h2 id="movieDownloadHeading" class="dlg-title"><img src="../../assets/icon.png" alt="">Download movie</h2>

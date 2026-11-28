@@ -14,6 +14,7 @@ const moviebox = require('./moviebox');
 const { defaultName, saveMovie } = require('./movie-download');
 const updater = require('./updater');
 const transcode = require('./transcode');
+const liveBuffer = require('./live-buffer');
 const youtube = require('./youtube');
 const appId = 'com.sadique.iptv.desktop'; // Matches build.appId in package.json.
 
@@ -59,7 +60,7 @@ function roundWindowCorners(win) {
     // Electron reports client bounds for a frameless resizable window, but
     // the Windows region starts at the outer edge of its resize frame.
     const frameInset = 8;
-    const radius = Math.min(18, Math.floor(Math.min(width, height) / 2));
+    const radius = Math.min(10, Math.floor(Math.min(width, height) / 2));
     if (!radius) return;
     const rows = [{ x: frameInset, y: radius, width, height: height - 2 * radius }];
     for (let y = 0; y < radius; y++) {
@@ -203,6 +204,7 @@ app.on('window-all-closed', () => {
 
 // Never leave a transcode ffmpeg running after the app quits.
 app.on('before-quit', () => {
+  liveBuffer.stop();
   try { transcode.shutdown(); } catch (_) {}
 });
 
@@ -253,6 +255,10 @@ ipcMain.handle('dialog:openM3U', async () => {
 ipcMain.handle('transcode:start', (_e, url) => transcode.startTranscode(url));
 ipcMain.handle('transcode:stop', () => { transcode.stopTranscode(); return true; });
 ipcMain.handle('transcode:status', () => transcode.status());
+ipcMain.handle('live-buffer:start', (event, options) => isAppFrame(event) && options
+  ? liveBuffer.start(options) : { error: 'Invalid live buffer request' });
+ipcMain.handle('live-buffer:stop', event => { if (isAppFrame(event)) liveBuffer.stop(); });
+ipcMain.handle('live-buffer:status', event => isAppFrame(event) ? liveBuffer.status() : null);
 
 // Custom title bar (frameless window, v1.0.3): minimise / maximise / close.
 ipcMain.handle('window:minimize', () => { if (mainWindow) mainWindow.minimize(); return true; });
@@ -296,7 +302,9 @@ ipcMain.handle('media:setHeaders', (_e, h) => {
   mediaHeaders = (h && h.host) ? { host: h.host, referer: h.referer || '', cookie: h.cookie || '' } : null;
   return true;
 });
-ipcMain.handle('mb:search', (_e, q) => moviebox.search(q));
+ipcMain.handle('mb:search', (_e, q, known) => moviebox.search(q, Array.isArray(known)
+  ? known.slice(0, 500).filter(movie => typeof movie?.title === 'string' && typeof movie.subjectId === 'string')
+  : []));
 ipcMain.handle('mb:details', (_e, subjectId) => moviebox.getDetails(subjectId));
 ipcMain.handle('mb:play', (_e, args) => moviebox.getPlayStreams(args));
 let downloadChoices = [];

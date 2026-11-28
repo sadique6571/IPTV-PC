@@ -272,6 +272,12 @@ let hlsRetries = 0;
 let hlsRetryTimer = null;
 let hlsRetryUrl = null;
 let currentStreamUrl = '';
+let liveBuffer = null;
+let liveFragment = null;
+let suppressedProgress = '';
+let mediaBytes = 0;
+let lastNetworkBytes = 0;
+let lastNetworkTime = performance.now();
 let mpegtsNoFrameTimer = null;
 // MPEG-2 transcode state (v1.0.3): when a raw TS stream's video codec
 // is not H.264, the main process re-encodes it to H.264/AAC HLS on
@@ -316,9 +322,10 @@ function openInExternalPlayer() {
   toast('External player mein khul raha hai…');
 }
 
-function attachSource(url) {
+function attachSource(url, options = {}) {
   hideYouTubeEmbed();
   if (hls) { hls.destroy(); hls = null; }
+  liveFragment = null;
   if (mpegtsPlayer) { try { mpegtsPlayer.destroy(); } catch (_) {} mpegtsPlayer = null; }
   if (hlsRetryTimer) { clearTimeout(hlsRetryTimer); hlsRetryTimer = null; }
   if (mpegtsNoFrameTimer) { clearTimeout(mpegtsNoFrameTimer); mpegtsNoFrameTimer = null; }
@@ -353,6 +360,7 @@ function attachSource(url) {
     // hit live-edge races that a single failed fragment must not kill.
     hls = new Hls({
       maxBufferLength: 30,
+      ...(options.buffered ? { startPosition: options.offset, initialLiveManifestSize: 1 } : {}),
       fragLoadingMaxRetry: 6,
       manifestLoadingMaxRetry: 6,
       levelLoadingMaxRetry: 6,
@@ -360,6 +368,11 @@ function attachSource(url) {
     hlsRetryUrl = url;
     hls.loadSource(url);
     hls.attachMedia(video);
+    hls.on(Hls.Events.FRAG_CHANGED, (_event, data) => { liveFragment = data.frag; });
+    hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => updateAudioControl());
+    hls.on(Hls.Events.FRAG_LOADED, (_event, { frag }) => {
+      if (!options.buffered && !isTranscodePlaylist) mediaBytes += frag.stats?.loaded || 0;
+    });
     // A fragment buffered = playback is healthy again: fresh retries.
     hls.on(Hls.Events.FRAG_BUFFERED, () => { hlsRetries = 0; });
     hls.on(Hls.Events.ERROR, (_e, data) => {
@@ -382,16 +395,16 @@ function attachSource(url) {
         if (hlsRetries < 3) {
           hlsRetries += 1;
           toast('Dobara koshish ho rahi hai…');
-          if (hlsRetries === 1) {
+          if (options.buffered || hlsRetries === 1) {
             // First retry: resume loading on the same instance.
-            try { hls.startLoad(); } catch (_) {}
+            try { hls.startLoad(options.buffered ? video.currentTime || options.offset : -1); } catch (_) {}
           } else {
             // Same error again: full re-attach after a short delay.
             // Guarded by hlsRetryUrl so a channel switch cancels it.
             if (hlsRetryTimer) clearTimeout(hlsRetryTimer);
             hlsRetryTimer = setTimeout(() => {
               hlsRetryTimer = null;
-              if (hls && hlsRetryUrl === url) attachSource(url);
+              if (hls && hlsRetryUrl === url && !video.paused) attachSource(url);
             }, 1500);
           }
           return;
@@ -573,6 +586,7 @@ function handleMp4NoFrames(url) {
 }
 function playSource(url, opts) {
   opts = opts || {};
+  cancelLiveBuffer();
   // A fresh explicit play gets a fresh transcode attempt (a transient
   // ffmpeg failure must not stay sticky for the channel).
   transcodeAttemptedFor = '';
@@ -584,8 +598,7 @@ function playSource(url, opts) {
   video.muted = false;
   const p = video.play();
   if (p && p.catch) p.catch((e) => { console.warn('play blocked:', e); toast('Press play to start'); });
-  $('btnPlay').textContent = '❚❚';
-  $('bigPlay').classList.add('hidden');
+  syncPlayerControls();
   if (opts.title) {
     const np = $('nowPlaying');
     np.textContent = '▶ ' + opts.title;
@@ -600,6 +613,7 @@ function playSource(url, opts) {
   updateUpNext();
 }
 function playChannel(ch) {
+  moviePlayRequest++;
   const web = ch.unavailable || ch.openInBrowser ? {} : parseYouTubeSource(ch.url);
   if (web) {
     playWebChannel(ch, web);
@@ -654,6 +668,7 @@ function hideYouTubeEmbed() {
   $('playerWrap').classList.remove('yt-mode');
 }
 async function playWebChannel(ch, source) {
+  cancelLiveBuffer();
   hideYouTubeEmbed();
   const selection = ytSelection;
   // Stop whatever was playing (normal stream or another embed).
@@ -701,17 +716,89 @@ async function playWebChannel(ch, source) {
   window.api.openExternal(ch.url);
   $('statusBar').textContent = 'Browser: ' + ch.name;
 }
+function cancelLiveBuffer() {
+  if (!liveBuffer) return;
+  liveBuffer = null;
+  $('btnLive').classList.add('hidden');
+  window.api.stopLiveBuffer().catch(() => {});
+}
+
+function startLiveBuffer() {
+  const details = hls?.latestLevelDetails;
+  const audioTrack = hls?.audioTracks?.[hls.audioTrack];
+  const frag = liveFragment || details?.fragments.find(fragment =>
+    video.currentTime >= fragment.start && video.currentTime < fragment.start + fragment.duration);
+  if (!details?.live || !frag || !Number.isSafeInteger(frag.sn) || !details.url || transcodePlaylistUrl) return;
+  const sourcePlayer = hls;
+  const session = { channel: current.channel, result: null, bytes: 0, wantsPlayback: false, active: false };
+  liveBuffer = session;
+  $('btnLive').classList.remove('hidden');
+  $('statusBar').textContent = 'Paused · saving live TV…';
+  sourcePlayer.stopLoad();
+  window.api.startLiveBuffer({
+    video: details.url,
+    audio: audioTrack?.url || '',
+    anchor: frag.sn,
+    offset: Math.max(0, video.currentTime - frag.start),
+  }).then(result => {
+    if (liveBuffer !== session) return;
+    if (!result?.url) {
+      cancelLiveBuffer();
+      sourcePlayer.startLoad(video.currentTime);
+      $('statusBar').textContent = 'Paused · live window only';
+      if (session.wantsPlayback) resumeVideo();
+      return;
+    }
+    session.result = result;
+    $('statusBar').textContent = result.exact ? 'Paused · live TV is being saved' : 'Pause point expired · earliest saved video is ready';
+    if (session.wantsPlayback) resumeLiveBuffer(session);
+  }).catch(() => {
+    if (liveBuffer !== session) return;
+    cancelLiveBuffer();
+    sourcePlayer.startLoad(video.currentTime);
+    $('statusBar').textContent = 'Paused · live window only';
+    if (session.wantsPlayback) resumeVideo();
+  });
+}
+
+function resumeVideo() {
+  video.play().catch(() => toast('Press play to start'));
+}
+
+function resumeLiveBuffer(session) {
+  if (!session.result) {
+    session.wantsPlayback = true;
+    toast('Preparing the live buffer…');
+    return;
+  }
+  session.active = true;
+  attachSource(session.result.url, { buffered: true, offset: session.result.offset });
+  resumeVideo();
+  $('statusBar').textContent = 'Playing saved live TV: ' + session.channel.name;
+}
+
 function playPause() {
   // A YouTube embed has its own controls — the app's play/pause must
   // never touch the (stopped) <video> behind it.
   if (ytActive) return;
   if (!video.src && !video.currentSrc) return;
-  if (video.paused) { video.play(); $('btnPlay').textContent = '❚❚'; $('bigPlay').classList.add('hidden'); }
-  else { video.pause(); $('btnPlay').textContent = '▶'; $('bigPlay').classList.remove('hidden'); }
+  if (video.paused) {
+    if (liveBuffer && !liveBuffer.active) resumeLiveBuffer(liveBuffer);
+    else resumeVideo();
+  } else {
+    video.pause();
+    if (current?.kind === 'tv' && !liveBuffer) startLiveBuffer();
+  }
+}
+function seekWindow() {
+  if (Number.isFinite(video.duration) && video.duration > 0) return [0, video.duration];
+  const ranges = video.seekable;
+  return ranges.length ? [ranges.start(0), ranges.end(ranges.length - 1)] : null;
 }
 function seekBy(sec) {
-  if (!isFinite(video.duration)) { toast('Live stream — cannot seek'); return; }
-  video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + sec));
+  const range = seekWindow();
+  if (!range) { toast('This stream is not seekable yet'); return; }
+  video.currentTime = Math.max(range[0], Math.min(range[1] - 0.05, video.currentTime + sec));
 }
 function setQuality(label) {
   const src = currentSources.find((s) => s.label === label);
@@ -733,15 +820,17 @@ function setQuality(label) {
 
 // ---------- player bar wiring ----------
 video.addEventListener('timeupdate', () => {
-  const dur = video.duration;
-  if (isFinite(dur) && dur > 0) {
-    $('seek').value = Math.round((video.currentTime / dur) * 1000);
-    $('timeRead').textContent = fmt(video.currentTime) + ' / ' + fmt(dur);
+  const range = seekWindow();
+  if (range && range[1] > range[0]) {
+    const percent = Math.max(0, Math.min(1, (video.currentTime - range[0]) / (range[1] - range[0])));
+    $('seek').value = Math.round(percent * 1000);
+    $('seek').style.setProperty('--progress', (percent * 100) + '%');
+    $('timeRead').textContent = fmt(Math.max(0, video.currentTime - range[0])) + ' / ' + fmt(range[1] - range[0]);
   } else {
     $('timeRead').textContent = fmt(video.currentTime) + ' / LIVE';
   }
   // Continue Watching save (movies only, every ~5s via throttle)
-  if (current && current.kind === 'movie' && current.cwKey) {
+  if (current && current.kind === 'movie' && current.cwKey && current.cwKey !== suppressedProgress) {
     if (!video._lastSave || Date.now() - video._lastSave > 5000) {
       video._lastSave = Date.now();
       state.continueWatching[current.cwKey] = Object.assign({}, state.continueWatching[current.cwKey], {
@@ -770,6 +859,7 @@ video.addEventListener('ended', () => {
 // Playback actually running = healthy again: fresh HLS retry budget.
 // And if real frames exist, any codec warning was a false alarm.
 video.addEventListener('playing', () => {
+  syncPlayerControls();
   hlsRetries = 0;
   if (video.videoWidth > 0) {
     hideCodecMsg();
@@ -796,7 +886,13 @@ video.addEventListener('error', () => {
   if (mp4NoFrameTimer) { clearTimeout(mp4NoFrameTimer); mp4NoFrameTimer = null; }
   handleMp4NoFrames(currentStreamUrl);
 });
-video.addEventListener('click', playPause);
+video.addEventListener('play', syncPlayerControls);
+video.addEventListener('pause', syncPlayerControls);
+video.addEventListener('waiting', showPlayerBar);
+video.addEventListener('click', () => {
+  if (document.fullscreenElement && !video.paused) showPlayerBar();
+  else playPause();
+});
 $('btnPlay').onclick = playPause;
 // YouTube embed escape hatch (yt-mode only): if the embed shows a black
 // player / YouTube error on the user's PC, one tap opens the channel in
@@ -807,18 +903,40 @@ $('ytOpenBrowser').onclick = () => {
 $('btnBack10').onclick = () => seekBy(-10);
 $('btnFwd10').onclick = () => seekBy(10);
 $('seek').addEventListener('input', (e) => {
-  if (isFinite(video.duration) && video.duration > 0) {
-    video.currentTime = (e.target.value / 1000) * video.duration;
-  }
+  const range = seekWindow();
+  if (range) video.currentTime = Math.min(range[1] - 0.05, range[0] + (e.target.value / 1000) * (range[1] - range[0]));
 });
+let hideBarTimer;
+function showPlayerBar() {
+  clearTimeout(hideBarTimer);
+  $('playerWrap').classList.remove('controls-hidden');
+  if (document.fullscreenElement && !video.paused && !video.ended) {
+    hideBarTimer = setTimeout(() => {
+      if (!$('popupMenu').classList.contains('hidden') || $('seek').matches(':active') || video.readyState < 3) return;
+      $('playerWrap').classList.add('controls-hidden');
+    }, 3000);
+  }
+}
+function syncPlayerControls() {
+  $('btnPlay').textContent = video.paused ? '▶' : '❚❚';
+  $('bigPlay').classList.toggle('hidden', !video.paused || !current || ytActive);
+  updateAudioControl();
+  showPlayerBar();
+}
+document.addEventListener('fullscreenchange', showPlayerBar);
+$('playerWrap').addEventListener('pointermove', showPlayerBar);
+$('playerWrap').addEventListener('pointerup', showPlayerBar);
+$('playerWrap').addEventListener('focusin', showPlayerBar);
+$('btnLive').onclick = () => { if (liveBuffer) playChannel(liveBuffer.channel); };
 $('btnFull').onclick = () => {
   if (document.fullscreenElement) document.exitFullscreen();
   else $('playerWrap').requestFullscreen().catch(() => toast('Fullscreen not allowed'));
 };
 $('btnCC').onclick = () => toggleCC();
 $('btnQuality').onclick = () => showQualityMenu();
-$('btnPrev').onclick = () => stepEpisode(-1);
-$('btnNext').onclick = () => stepEpisode(1);
+$('btnPrev').onclick = () => stepPlayback(-1);
+$('btnNext').onclick = () => stepPlayback(1);
+$('btnAudio').onclick = showAudioMenu;
 $('btnOpenExternal').onclick = openInExternalPlayer;
 // No volume slider in the player bar (Android parity) — volume is on
 // the keyboard: + / - adjust, M mutes.
@@ -859,7 +977,40 @@ $('topbar').addEventListener('dblclick', (e) => {
 });
 
 // ---------- popups ----------
-function closePopup() { $('popupMenu').classList.add('hidden'); }
+function closePopup() { $('popupMenu').classList.add('hidden'); showPlayerBar(); }
+function updateAudioControl() {
+  const hasTracks = (hls?.audioTracks?.length || 0) > 1;
+  const hasDubs = current?.kind === 'movie' && current.subject?.dubs?.length;
+  $('btnAudio').classList.toggle('hidden', !hasTracks && !hasDubs);
+}
+function showAudioMenu() {
+  const trackPlayer = hls;
+  const playback = current;
+  const tracks = trackPlayer?.audioTracks || [];
+  const dubs = playback?.subject?.dubs || [];
+  const menu = $('popupMenu');
+  menu.innerHTML = '<div class="p-title">Audio</div>';
+  function addAudioOption(label, action) {
+    const button = document.createElement('button');
+    button.className = 'p-item';
+    button.textContent = label;
+    button.onclick = () => { closePopup(); action(); };
+    menu.append(button);
+  }
+  if (tracks.length > 1) tracks.forEach((track, index) =>
+    addAudioOption(track.name || track.lang || 'Track ' + (index + 1), () => {
+      if (hls === trackPlayer) trackPlayer.audioTrack = index;
+    }));
+  for (const dub of dubs) addAudioOption(dub.language || dub.label, async () => {
+    try {
+      const details = await window.api.mbDetails(dub.subjectId);
+      if (current !== playback) return;
+      if (details?.error || !details?.subjectId) { toast('Audio version unavailable'); return; }
+      playEpisode(details, playback.se, playback.ep, { position: video.currentTime });
+    } catch { toast('Could not load audio version'); }
+  });
+  if (menu.children.length > 1) menu.classList.remove('hidden');
+}
 function closeArrangeMenu() { $('arrangeMenu').classList.add('hidden'); }
 function showArrangeMenu() {
   const menu = $('arrangeMenu');
@@ -1003,6 +1154,7 @@ function movieCard(item) {
   card.onclick = () => openDetails(item.subjectId || item.id);
   return card;
 }
+let knownMovies = [];
 async function loadMovieHome() {
   const box = $('movieRails');
   box.innerHTML = '<div style="color:var(--muted);padding:8px">Loading…</div>';
@@ -1010,6 +1162,7 @@ async function loadMovieHome() {
   try {
     const feed = await window.api.mbFeed({});
     if (feed && feed.error) { box.innerHTML = `<div style="color:var(--muted);padding:8px">${esc(feed.error)}</div>`; return; }
+    knownMovies = (feed.rails || []).flatMap(rail => rail.items || []);
     box.innerHTML = '';
     (feed.rails || []).forEach((rail) => {
       const div = document.createElement('div');
@@ -1027,29 +1180,55 @@ async function loadMovieHome() {
   }
 }
 function renderContinueWatching() {
-  const entries = Object.values(state.continueWatching || {})
-    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  const entries = Object.entries(state.continueWatching || {})
+    .sort(([, a], [, b]) => (b.updatedAt || 0) - (a.updatedAt || 0));
   const row = $('continueRow');
   const list = $('continueList');
   if (!entries.length) { row.classList.add('hidden'); return; }
   row.classList.remove('hidden');
   list.innerHTML = '';
-  entries.forEach((cw) => {
+  entries.forEach(([key, cw]) => {
     const card = document.createElement('button');
     card.className = 'card';
     const pct = cw.duration ? Math.round((cw.position / cw.duration) * 100) : 0;
     card.innerHTML = (cw.poster ? `<img src="${esc(cw.poster)}" alt="" loading="lazy">` : '<div style="height:170px;background:#000"></div>') +
       `<div class="ctitle">${esc(cw.title)}</div><div class="cmeta">${fmt(cw.position)} / ${fmt(cw.duration)} · ${pct}%</div>`;
     card.onclick = () => openDetails(cw.subjectId, { resume: cw });
-    list.appendChild(card);
+    const entry = document.createElement('div');
+    entry.className = 'continue-entry';
+    const remove = document.createElement('button');
+    remove.className = 'continue-remove';
+    remove.textContent = '×';
+    remove.setAttribute('aria-label', 'Remove ' + cw.title + ' from Continue Watching');
+    const askRemove = () => {
+      const dialog = $('removeContinue');
+      $('removeContinueTitle').textContent = cw.title;
+      dialog.returnValue = 'cancel';
+      dialog.onclose = () => {
+        if (dialog.returnValue !== 'remove') return;
+        if (current?.cwKey === key) suppressedProgress = key;
+        delete state.continueWatching[key];
+        saveStateSoon();
+        renderContinueWatching();
+      };
+      dialog.showModal();
+    };
+    remove.onclick = askRemove;
+    card.oncontextmenu = event => { event.preventDefault(); askRemove(); };
+    entry.append(card, remove);
+    list.appendChild(entry);
   });
 }
 let searchTimer = 0;
+let searchRequest = 0;
 $('movieSearch').addEventListener('input', () => {
+  searchRequest++;
+  $('detailsView').classList.add('hidden');
   clearTimeout(searchTimer);
   searchTimer = setTimeout(runMovieSearch, 400);
 });
 async function runMovieSearch() {
+  const request = ++searchRequest;
   const q = $('movieSearch').value.trim();
   const home = $('moviesHome'), res = $('movieResults');
   if (!q) { home.classList.remove('hidden'); res.classList.add('hidden'); res.innerHTML = ''; return; }
@@ -1057,7 +1236,15 @@ async function runMovieSearch() {
   res.classList.remove('hidden');
   res.innerHTML = '<div style="padding:16px;color:var(--muted)">Searching…</div>';
   try {
-    const r = await window.api.mbSearch(q);
+    const recent = Object.values(state.continueWatching || {}).map(item => ({
+      subjectId: item.subjectId,
+      title: item.title.replace(/\s+S\d+\s+E\d+$/i, ''),
+      poster: item.poster,
+      isHindi: /[[(]hindi(?: dubbed)?[\])]/i.test(item.title),
+      type: /\sS\d+\s+E\d+$/i.test(item.title) ? 'series' : 'movie',
+    }));
+    const r = await window.api.mbSearch(q, [...knownMovies, ...recent]);
+    if (request !== searchRequest) return;
     if (r && r.error) { res.innerHTML = '<div style="padding:16px;color:var(--muted)">' + esc(r.error) + '</div>'; return; }
     res.innerHTML = '';
     (r.results || []).forEach((it) => {
@@ -1065,16 +1252,20 @@ async function runMovieSearch() {
       row.className = 'row';
       const poster = it.poster || it.image || '';
       row.innerHTML = (poster ? `<img class="poster" src="${esc(poster)}" alt="" loading="lazy">` : '<span class="logo-fallback">▣</span>') +
-        `<span class="name">${esc(it.title || it.name || '')}</span><span class="meta">${esc([it.year, it.type].filter(Boolean).join(' · '))}</span>`;
+        `<span class="name">${esc(it.title || it.name || '')}</span>${it.isHindi ? '<span class="badge">Hindi</span>' : ''}<span class="meta">${esc([it.year, it.type].filter(Boolean).join(' · '))}</span>`;
       row.onclick = () => openDetails(it.subjectId || it.id);
       res.appendChild(row);
     });
     if (!res.children.length) res.innerHTML = '<div style="padding:16px;color:var(--muted)">No results.</div>';
   } catch (e) {
+    if (request !== searchRequest) return;
     res.innerHTML = '<div style="padding:16px;color:var(--muted)">Search failed: ' + esc(e.message) + '</div>';
   }
 }
 async function openDetails(subjectId, opts) {
+  searchRequest++;
+  const request = ++detailsRequest;
+  currentDetails = null;
   opts = opts || {};
   const dv = $('detailsView');
   $('moviesHome').classList.add('hidden');
@@ -1083,13 +1274,23 @@ async function openDetails(subjectId, opts) {
   dv.innerHTML = '<div style="padding:16px;color:var(--muted)">Loading details…</div>';
   try {
     const d = await window.api.mbDetails(subjectId);
-    if (d && d.error) { dv.innerHTML = '<div style="padding:16px;color:var(--muted)">' + esc(d.error) + '</div>'; return; }
+    if (request !== detailsRequest) return;
+    if (d && d.error) { showDetailsError(d.error, subjectId, opts); return; }
     currentDetails = d;
+    d.isFav = state.favorites.includes('mb:' + d.subjectId);
     selectedSeason = (d.seasons && d.seasons.length) ? d.seasons[0].number : 1;
     renderDetails(d, opts.resume);
   } catch (e) {
-    dv.innerHTML = '<div style="padding:16px;color:var(--muted)">Failed to load details: ' + esc(e.message) + '</div>';
+    if (request === detailsRequest) showDetailsError(e.message, subjectId, opts);
   }
+}
+let detailsRequest = 0;
+function showDetailsError(message, subjectId, opts) {
+  const dv = $('detailsView');
+  dv.innerHTML = `<div class="d-desc">${esc(message)}</div><div class="actions">
+    <button class="btn primary" id="dRetry">Retry</button><button class="btn" id="dBack">Back</button></div>`;
+  $('dRetry').onclick = () => openDetails(subjectId, opts);
+  $('dBack').onclick = backToMoviesHome;
 }
 function renderDetails(d, resume) {
   const dv = $('detailsView');
@@ -1106,13 +1307,13 @@ function renderDetails(d, resume) {
         <div class="d-meta">${esc(d.meta || '')}</div>
       </div>
     </div>
-    ${d.overview ? `<div class="d-desc">${esc(d.overview)}</div>` : ''}
     <div class="actions">
-      <button class="btn primary" id="dPlay">▶ Play${isSeries ? ' S' + selectedSeason + ' E1' : ''}</button>
+      <button class="btn primary" id="dPlay">${resume ? 'Resume' : 'Play'}${isSeries && !resume ? ' S' + selectedSeason + ' E' + (eps[0]?.number || 1) : ''}</button>
       ${isSeries ? '' : '<button class="btn" id="dDownload">Download</button>'}
       <button class="btn" id="dFav">${d.isFav ? '★ Favorited' : '☆ Favorite'}</button>
       <button class="btn" id="dBack">← Back</button>
     </div>
+    ${d.overview ? `<details class="d-summary"><summary>Synopsis</summary><div class="d-desc">${esc(d.overview)}</div></details>` : ''}
     ${isSeries ? `
       <div class="season-row">${seasons.map((s) => `<button class="chip ${s.number === selectedSeason ? 'active' : ''}" data-season="${s.number}">Season ${s.number}</button>`).join('')}</div>
       <div class="ep-grid">${eps.map((ep) => `<button class="ep-btn ${ep.watched ? 'watched' : ''}" data-ep="${ep.number}">${ep.number}</button>`).join('')}</div>
@@ -1130,7 +1331,10 @@ function renderDetails(d, resume) {
     saveStateSoon();
   };
   dv.querySelector('#dPlay').onclick = () => {
-    if (isSeries) playEpisode(d, selectedSeason, eps.length ? eps[0].number : 1, resume);
+    if (isSeries) {
+      const match = /\sS(\d+)\sE(\d+)$/i.exec(resume?.title || '');
+      playEpisode(d, match ? Number(match[1]) : selectedSeason, match ? Number(match[2]) : eps[0]?.number || 1, resume);
+    }
     else playEpisode(d, 0, 0, resume);
   };
   dv.querySelectorAll('[data-season]').forEach((b) => {
@@ -1212,24 +1416,32 @@ async function openMovieDownload(movie) {
 }
 
 function backToMoviesHome() {
+  detailsRequest++;
+  moviePlayRequest++;
   $('detailsView').classList.add('hidden');
-  $('movieResults').classList.add('hidden');
-  $('moviesHome').classList.remove('hidden');
-  $('movieSearch').value = '';
+  const showResults = $('movieSearch').value.trim() && $('movieResults').children.length;
+  $('movieResults').classList.toggle('hidden', !showResults);
+  $('moviesHome').classList.toggle('hidden', Boolean(showResults));
   currentDetails = null;
 }
 async function playEpisode(d, season, episode, resume) {
   const isSeries = d.type === 'series' || (d.seasons && d.seasons.length > 0);
   const label = isSeries ? `${d.title} S${season} E${episode}` : d.title;
+  const request = ++moviePlayRequest;
+  const action = $('dPlay');
+  if (action) { action.disabled = true; action.textContent = 'Loading…'; }
+  let failed = true;
   $('statusBar').textContent = 'Loading: ' + label + '…';
   try {
     const r = await window.api.mbPlay({ subjectId: d.subjectId, se: season, ep: episode, detailPath: d.detailPath });
+    if (request !== moviePlayRequest) return;
     if (!r || r.error || !(r.sources && r.sources.length)) {
       toast('No playable streams found');
       $('statusBar').textContent = 'No streams for ' + label;
       return;
     }
     const cwKey = 'mb:' + d.subjectId + ':' + season + ':' + episode;
+    suppressedProgress = '';
     const resumeAt = resume ? resume.position : (state.continueWatching[cwKey] ? state.continueWatching[cwKey].position : 0);
     state.continueWatching[cwKey] = {
       subjectId: d.subjectId, title: label, poster: d.poster || '',
@@ -1248,6 +1460,7 @@ async function playEpisode(d, season, episode, resume) {
       });
     } catch (_) {}
     await loadCaptionsFor({ streamId: r.streamId, subjectId: d.subjectId, detailPath: d.detailPath });
+    if (request !== moviePlayRequest) return;
     playSource(best.url, {
       title: label,
       resumeAt: resumeAt || 0,
@@ -1258,10 +1471,29 @@ async function playEpisode(d, season, episode, resume) {
       },
     });
     $('statusBar').textContent = 'Playing: ' + label;
+    failed = false;
   } catch (e) {
+    if (request !== moviePlayRequest) return;
     toast('Playback failed: ' + e.message);
     $('statusBar').textContent = 'Playback failed';
+  } finally {
+    if (action?.isConnected && request === moviePlayRequest) {
+      action.disabled = false;
+      action.textContent = failed ? 'Retry' : 'Playing';
+      if (failed) action.onclick = () => playEpisode(d, season, episode, resume);
+    }
   }
+}
+let moviePlayRequest = 0;
+function stepPlayback(delta) {
+  if (current?.kind !== 'tv' || !current.channel) { stepEpisode(delta); return; }
+  const list = filtered.some(channel => channel.url === current.channel.url) ? filtered : channels;
+  const index = list.findIndex(channel => channel.url === current.channel.url);
+  if (index < 0 || list.length < 2) return;
+  const next = list[(index + delta + list.length) % list.length];
+  focusIndex = filtered.findIndex(channel => channel.url === next.url);
+  playChannel(next);
+  renderChannelList();
 }
 async function stepEpisode(delta) {
   if (!current || current.kind !== 'movie' || !current.subject) return;
@@ -1294,6 +1526,7 @@ function updateUpNext() {
 
 // ---------- tabs ----------
 function switchTab(tab) {
+  focusIndex = tab === 'tv' ? filtered.findIndex(channel => channel.url === current?.channel?.url) : -1;
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === tab));
   $('tvView').classList.toggle('hidden', tab !== 'tv');
   $('moviesView').classList.toggle('hidden', tab !== 'movies');
@@ -1302,7 +1535,7 @@ function switchTab(tab) {
   if (tab === 'movies' && !$('movieRails').children.length) loadMovieHome();
 }
 document.querySelectorAll('.tab').forEach((t) => { t.onclick = () => switchTab(t.dataset.tab); });
-$('tvSearch').addEventListener('input', applyChannelFilter);
+$('tvSearch').addEventListener('input', () => applyChannelFilter());
 $('openM3U').onclick = async () => {
   const r = await window.api.openM3U();
   if (!r) return;
@@ -1315,6 +1548,23 @@ $('openM3U').onclick = async () => {
   await loadChannels();
   toast(`Loaded ${list.length} channels`);
 };
+function closeHeaderMenu() {
+  $('headerMenu').classList.add('hidden');
+  $('headerMore').setAttribute('aria-expanded', 'false');
+}
+$('headerMore').onclick = () => {
+  const hiding = !$('headerMenu').classList.contains('hidden');
+  if (hiding) { closeHeaderMenu(); return; }
+  $('headerMenu').classList.remove('hidden');
+  $('headerMore').setAttribute('aria-expanded', 'true');
+  $('headerMenu').querySelector('button')?.focus();
+};
+$('headerMenu').querySelectorAll('[data-button]').forEach(button => {
+  button.onclick = () => {
+    closeHeaderMenu();
+    $(button.dataset.button).click();
+  };
+});
 
 // ---------- clock ----------
 function tickClock() {
@@ -1322,6 +1572,24 @@ function tickClock() {
   $('clock').textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 setInterval(tickClock, 10000);
+setInterval(async () => {
+  const session = liveBuffer;
+  if (session) {
+    try {
+      const status = await window.api.liveBufferStatus();
+      if (session === liveBuffer && status) {
+        mediaBytes += Math.max(0, status.bytes - session.bytes);
+        session.bytes = status.bytes;
+        if (status.message && session.active) $('statusBar').textContent = status.message;
+      }
+    } catch (_) {}
+  }
+  const now = performance.now();
+  const mbps = (mediaBytes - lastNetworkBytes) * 8 / Math.max(1, now - lastNetworkTime) / 1000;
+  $('network').textContent = `${mbps.toFixed(1)} Mbps / ${Math.round(mediaBytes / 1e6)} MB`;
+  lastNetworkBytes = mediaBytes;
+  lastNetworkTime = now;
+}, 1000);
 
 // ---------- keyboard navigation ----------
 function visibleRows() {
@@ -1336,16 +1604,19 @@ function moveFocus(delta) {
   if (!rows.length) return;
   focusIndex = Math.max(0, Math.min(rows.length - 1, (focusIndex < 0 ? 0 : focusIndex + delta)));
   rows.forEach((r, i) => r.classList.toggle('focused', i === focusIndex));
+  rows[focusIndex].focus({ preventScroll: true });
   rows[focusIndex].scrollIntoView({ block: 'nearest' });
 }
 document.addEventListener('keydown', (e) => {
-  if (movieDialog.open) return;
+  if (movieDialog.open || $('removeContinue').open) return;
+  if (document.fullscreenElement) showPlayerBar();
   const inInput = /INPUT|TEXTAREA/.test(document.activeElement.tagName);
   if (e.key === 'Escape') {
+    if (!$('headerMenu').classList.contains('hidden')) { closeHeaderMenu(); $('headerMore').focus(); return; }
     if (!$('popupMenu').classList.contains('hidden')) { closePopup(); return; }
     if (!$('arrangeMenu').classList.contains('hidden')) { closeArrangeMenu(); return; }
-    if (currentDetails) { backToMoviesHome(); return; }
     if (document.fullscreenElement) { document.exitFullscreen(); return; }
+    if (state.lastTab === 'movies' && !$('detailsView').classList.contains('hidden')) { backToMoviesHome(); return; }
     return;
   }
   if (inInput) {
@@ -1354,11 +1625,13 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   switch (e.key) {
-    case 'ArrowDown': e.preventDefault(); if (e.shiftKey) moveFocusedChannel(1); else moveFocus(1); break;
-    case 'ArrowUp': e.preventDefault(); if (e.shiftKey) moveFocusedChannel(-1); else moveFocus(-1); break;
+    case 'ArrowDown': e.preventDefault(); if (!document.fullscreenElement) { if (e.shiftKey) moveFocusedChannel(1); else moveFocus(1); } break;
+    case 'ArrowUp': e.preventDefault(); if (!document.fullscreenElement) { if (e.shiftKey) moveFocusedChannel(-1); else moveFocus(-1); } break;
     case 'ArrowRight': if (document.activeElement === video || document.activeElement === document.body) { seekBy(10); } break;
     case 'ArrowLeft': if (document.activeElement === video || document.activeElement === document.body) { seekBy(-10); } break;
     case 'Enter': {
+      if (document.activeElement.closest('button')) break;
+      if (document.fullscreenElement) { e.preventDefault(); playPause(); break; }
       const rows = visibleRows();
       if (rows[focusIndex]) { e.preventDefault(); rows[focusIndex].click(); }
       break;
@@ -1374,7 +1647,8 @@ document.addEventListener('keydown', (e) => {
   }
 });
 document.addEventListener('click', (e) => {
-  if (!$('popupMenu').classList.contains('hidden') && !$('popupMenu').contains(e.target) && e.target.id !== 'btnQuality') closePopup();
+  if (!e.target.closest('#headerMenu, #headerMore')) closeHeaderMenu();
+  if (!$('popupMenu').classList.contains('hidden') && !$('popupMenu').contains(e.target) && !e.target.closest('#btnQuality, #btnAudio')) closePopup();
   if (!$('arrangeMenu').classList.contains('hidden') && !$('arrangeMenu').contains(e.target) && e.target.id !== 'arrangeBtn') closeArrangeMenu();
 });
 

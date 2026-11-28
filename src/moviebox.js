@@ -13,6 +13,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { app } = require('electron');
+const { hasHindiAudio, searchTitles } = require('./movie-search');
 
 // ---------- constants (verbatim from MovieBox.kt) ----------
 const BASE = '/wefeed-mobile-bff';
@@ -336,7 +337,8 @@ function parseSearchMovie(s) {
     title,
     year,
     poster: poster || '',
-    isHindi: /hindi/i.test(title),
+    isHindi: hasHindiAudio(s, title),
+    releaseDate: s.releaseDate || '',
     type: stype === 2 ? 'series' : 'movie',
   };
 }
@@ -376,18 +378,9 @@ async function searchPage(query, page) {
   }
   return movies;
 }
-async function search(query) {
+async function search(query, known = []) {
   try {
-    const seen = new Set();
-    const all = [];
-    for (let p = 1; p <= 3; p++) {
-      const batch = await searchPage(query, p);
-      for (const m of batch) if (!seen.has(m.subjectId)) { seen.add(m.subjectId); all.push(m); }
-      if (batch.length < 15) break;
-    }
-    const q = query.toLowerCase();
-    all.sort((a, b) => (b.title.toLowerCase().includes(q) ? 1 : 0) - (a.title.toLowerCase().includes(q) ? 1 : 0));
-    return { results: all };
+    return { results: await searchTitles(query, known, searchPage) };
   } catch (e) {
     return { error: `Search failed: ${e.message}` };
   }
