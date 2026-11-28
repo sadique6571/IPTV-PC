@@ -59,6 +59,7 @@
       <div id="moviesView" class="view hidden">
         <div class="search-row">
           <input id="movieSearch" type="text" placeholder="Search movies &amp; series…" autocomplete="off">
+          <button id="showDownloads" class="pill" aria-controls="downloadsView" aria-expanded="false">Downloads</button>
         </div>
         <div id="moviesHome">
           <div id="continueRow" class="rail hidden">
@@ -69,6 +70,15 @@
         </div>
         <div id="movieResults" class="list hidden"></div>
         <div id="detailsView" class="details hidden"></div>
+        <section id="downloadsView" class="view hidden" aria-label="Downloaded videos">
+          <div class="downloads-heading">
+            <h2>Downloads</h2>
+            <button id="addDownloadedVideo" class="btn">Add video</button>
+            <button id="closeDownloads" class="btn">Back</button>
+          </div>
+          <p id="downloadsStatus" class="downloads-status" role="status"></p>
+          <div id="downloadsList" class="list"></div>
+        </section>
       </div>
 
       <div id="statusBar" class="status">Loading channels…</div>
@@ -106,6 +116,8 @@
           <button id="btnCC" class="chip-btn" title="English subtitles">CC</button>
           <button id="btnQuality" class="chip-btn" title="Quality">Quality</button>
           <button id="btnLive" class="chip-btn hidden" title="Return to live">Go Live</button>
+          <button id="btnRecord" class="chip-btn hidden" title="Record live TV as MP4">Record</button>
+          <button id="btnPiP" class="chip-btn" title="Picture-in-Picture (P)" aria-label="Picture-in-Picture" aria-pressed="false" disabled>PiP</button>
           <button id="btnFull" class="chip-btn" title="Fullscreen (F)">⛶</button>
           </div>
         </div>

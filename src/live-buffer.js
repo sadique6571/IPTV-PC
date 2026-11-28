@@ -6,6 +6,7 @@ const path = require('node:path');
 const os = require('node:os');
 const http = require('node:http');
 const { randomUUID } = require('node:crypto');
+const { spawn } = require('node:child_process');
 const { Readable, Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const { setTimeout: delay } = require('node:timers/promises');
@@ -14,6 +15,7 @@ const KEEP_SECONDS = 3630;
 const KEEP_BYTES = 6 * 1024 ** 3;
 const MAX_SEGMENT = 32 * 1024 ** 2;
 let current;
+let activeExport;
 
 function mediaUrl(value, base) {
   const url = new URL(value, base);
@@ -97,13 +99,17 @@ function respond(session, req, res) {
   const prefix = '/' + session.token + '/';
   if (req.method !== 'GET' || !name?.startsWith(prefix)) { res.writeHead(404).end(); return; }
   const asset = name.slice(prefix.length);
-  if (asset === 'buffer.m3u8' || asset === 'video.m3u8' || asset === 'audio.m3u8' && session.audio) {
+  const recording = asset.startsWith('recording-');
+  const file = recording ? asset.slice('recording-'.length) : asset;
+  const snapshot = recording ? session.exportSnapshot : session;
+  if (snapshot && (file === 'buffer.m3u8' || file === 'video.m3u8' || file === 'audio.m3u8' && session.audio)) {
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
     res.setHeader('Cache-Control', 'no-store');
-    const text = asset === 'buffer.m3u8' && session.audio
-      ? '#EXTM3U\n#EXT-X-VERSION:6\n#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="Audio",DEFAULT=YES,AUTOSELECT=YES,URI="audio.m3u8"\n' +
-        '#EXT-X-STREAM-INF:BANDWIDTH=10000000,AUDIO="audio"\nvideo.m3u8\n'
-      : manifest(session, asset === 'audio.m3u8' ? 'audio' : 'video');
+    const trackPrefix = recording ? 'recording-' : '';
+    const text = file === 'buffer.m3u8' && session.audio
+      ? `#EXTM3U\n#EXT-X-VERSION:6\n#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="Audio",DEFAULT=YES,AUTOSELECT=YES,URI="${trackPrefix}audio.m3u8"\n` +
+        `#EXT-X-STREAM-INF:BANDWIDTH=10000000,AUDIO="audio"\n${trackPrefix}video.m3u8\n`
+      : manifest(snapshot, file === 'audio.m3u8' ? 'audio' : 'video');
     res.end(text);
     return;
   }
@@ -170,7 +176,7 @@ async function record(session, anchor, offset) {
       }
       failures = 0;
       session.error = '';
-      while (session.expired[0]?.until <= Date.now()) {
+      while (!session.exportSnapshot && session.expired[0]?.until <= Date.now()) {
         const { id } = session.expired.shift();
         await Promise.allSettled(['video', 'audio'].map(track => fsp.rm(
           path.join(session.dir, `${track}-${id}.ts`), { force: true },
@@ -209,7 +215,7 @@ async function start({ video, audio, anchor, offset }) {
     session.url = `http://127.0.0.1:${session.server.address().port}/${session.token}/buffer.m3u8`;
     await record(session, anchor, offset);
   })().catch(error => { if (!session.signal.aborted) session.ready({ error: error.message }); })
-    .finally(() => { if (session.signal.aborted) cleanup(session); });
+    .finally(() => { if (session.signal.aborted && !session.exportSnapshot) cleanup(session); });
   const startup = setTimeout(() => session.ready({ error: 'Live buffer could not start' }), 18000);
   const result = await ready;
   clearTimeout(startup);
@@ -229,9 +235,53 @@ function stop() {
   current = undefined;
   session.ready({ error: 'Live buffer closed' });
   session.controller.abort();
-  cleanup(session);
+  if (!session.exportSnapshot) cleanup(session);
 }
 
 function status() { return { bytes: current?.transferred || 0, message: current?.error || '' }; }
 
-module.exports = { start, stop, status, parsePlaylist };
+function position({ sequence, date, offset }) {
+  const session = current;
+  if (!session?.entries.length) return null;
+  const index = session.entries.findIndex(({ video }) =>
+    Number.isFinite(date) && Number.isFinite(video.date)
+      ? Math.abs(date - video.date) < 25 : video.sequence === sequence);
+  return {
+    url: session.url,
+    exact: index >= 0,
+    offset: index < 0 ? 0 : session.entries.slice(0, index).reduce((time, entry) => time + entry.video.duration, 0) +
+      Math.max(0, Math.min(offset, session.entries[index].video.duration - 0.05)),
+  };
+}
+
+async function exportRecording(destination, ffmpeg) {
+  const session = current;
+  if (activeExport || !session?.entries.length) throw new Error('No recording is ready to save');
+  const controller = new AbortController();
+  activeExport = controller;
+  const partial = destination + '.' + randomUUID() + '.part';
+  session.exportSnapshot = { ...session, entries: [...session.entries], ended: true };
+  const recordingUrl = new URL('recording-buffer.m3u8', session.url).href;
+  try {
+    await new Promise((resolve, reject) => {
+      const convert = spawn(ffmpeg, [
+        '-v', 'error', '-nostdin', '-n', '-i', recordingUrl, '-map', '0:v:0', '-map', '0:a:0?',
+        '-c', 'copy', '-movflags', '+faststart', '-f', 'mp4', partial,
+      ], { signal: controller.signal, timeout: 300000, windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
+      let failure = '';
+      convert.stderr.on('data', data => { failure = (failure + data).slice(-2000); });
+      convert.on('error', reject);
+      convert.on('close', code => code === 0 ? resolve() : reject(new Error(failure || 'MP4 export failed')));
+    });
+    await fsp.rename(partial, destination);
+  } finally {
+    await fsp.rm(partial, { force: true }).catch(() => {});
+    session.exportSnapshot = null;
+    activeExport = undefined;
+    if (session.signal.aborted) cleanup(session);
+  }
+}
+
+function cancelExport() { activeExport?.abort(); }
+
+module.exports = { start, stop, status, position, exportRecording, cancelExport, parsePlaylist };
