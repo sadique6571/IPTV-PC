@@ -20,6 +20,10 @@ contextBridge.exposeInMainWorld('api', {
   saveMovie: (index, title) => ipcRenderer.invoke('movie:save', index, title),
   cancelMovie: () => ipcRenderer.invoke('movie:cancel'),
   onMovieProgress: cb => ipcRenderer.on('movie:progress', (_event, progress) => cb(progress)),
+  listDownloads: () => ipcRenderer.invoke('downloads:list'),
+  addDownloadedVideo: () => ipcRenderer.invoke('downloads:add'),
+  playDownload: id => ipcRenderer.invoke('downloads:play', id),
+  removeDownload: id => ipcRenderer.invoke('downloads:remove', id),
   mbCaptions: (args) => ipcRenderer.invoke('mb:captions', args),
   mbFeed: (args) => ipcRenderer.invoke('mb:feed', args),
   // YouTube live: resolve the current live video ID at play time.
@@ -31,6 +35,8 @@ contextBridge.exposeInMainWorld('api', {
   startLiveBuffer: options => ipcRenderer.invoke('live-buffer:start', options),
   stopLiveBuffer: () => ipcRenderer.invoke('live-buffer:stop'),
   liveBufferStatus: () => ipcRenderer.invoke('live-buffer:status'),
+  liveBufferPosition: anchor => ipcRenderer.invoke('live-buffer:position', anchor),
+  saveRecording: title => ipcRenderer.invoke('live-buffer:export', title),
   // Custom title bar (frameless window): window controls.
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
   toggleMaximizeWindow: () => ipcRenderer.invoke('window:maximize-toggle'),

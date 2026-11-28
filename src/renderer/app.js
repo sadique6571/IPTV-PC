@@ -368,6 +368,7 @@ function attachSource(url, options = {}) {
     hlsRetryUrl = url;
     hls.loadSource(url);
     hls.attachMedia(video);
+    hls.on(Hls.Events.LEVEL_UPDATED, updateRecordButton);
     hls.on(Hls.Events.FRAG_CHANGED, (_event, data) => { liveFragment = data.frag; });
     hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, () => updateAudioControl());
     hls.on(Hls.Events.FRAG_LOADED, (_event, { frag }) => {
@@ -416,7 +417,7 @@ function attachSource(url, options = {}) {
       // Other fatal types (KEY_SYSTEM_ERROR etc.): nothing safe to retry.
       toast('Stream error: ' + (data.details || 'playback failed'));
     });
-  } else if (isMp4) {
+  } else if (isMp4 || options.local) {
     video.src = url;
     // Movies/series only: a direct MP4 the browser cannot decode
     // (HEVC) shows no picture and never errors on Windows — watch for
@@ -594,7 +595,7 @@ function playSource(url, opts) {
   currentSources = opts.sources || [{ label: 'Auto', url }];
   current = Object.assign({ kind: 'tv' }, opts.meta || {});
   if (opts.title) current.playLabel = opts.title;
-  attachSource(url);
+  attachSource(url, { local: current.kind === 'download' });
   video.muted = false;
   const p = video.play();
   if (p && p.catch) p.catch((e) => { console.warn('play blocked:', e); toast('Press play to start'); });
@@ -720,59 +721,85 @@ function cancelLiveBuffer() {
   if (!liveBuffer) return;
   liveBuffer = null;
   $('btnLive').classList.add('hidden');
+  updateRecordButton();
   window.api.stopLiveBuffer().catch(() => {});
 }
 
-function startLiveBuffer() {
+function liveAnchor() {
   const details = hls?.latestLevelDetails;
-  const audioTrack = hls?.audioTracks?.[hls.audioTrack];
   const frag = liveFragment || details?.fragments.find(fragment =>
     video.currentTime >= fragment.start && video.currentTime < fragment.start + fragment.duration);
-  if (!details?.live || !frag || !Number.isSafeInteger(frag.sn) || !details.url || transcodePlaylistUrl) return;
+  if (!details?.live || !frag || !Number.isSafeInteger(frag.sn) || !details.url || transcodePlaylistUrl) return null;
+  return { sequence: frag.sn, date: frag.programDateTime, offset: Math.max(0, video.currentTime - frag.start) };
+}
+
+let savingRecording = false;
+function updateRecordButton() {
+  const button = $('btnRecord');
+  const available = current?.kind === 'tv' && !ytActive && (liveBuffer || liveAnchor());
+  button.classList.toggle('hidden', !available);
+  button.disabled = savingRecording || !!liveBuffer && !liveBuffer.result;
+  button.textContent = savingRecording ? 'Saving…' : liveBuffer ? 'Save recording' : 'Record';
+}
+
+function startLiveBuffer(recording = false) {
+  const anchor = liveAnchor();
+  if (!anchor) return;
+  const audioTrack = hls.audioTracks?.[hls.audioTrack];
   const sourcePlayer = hls;
-  const session = { channel: current.channel, result: null, bytes: 0, wantsPlayback: false, active: false };
+  const session = {
+    channel: current.channel, result: null, bytes: 0, wantsPlayback: false, active: false,
+    recording, pausedAt: null,
+  };
   liveBuffer = session;
-  $('btnLive').classList.remove('hidden');
-  $('statusBar').textContent = 'Paused · saving live TV…';
-  sourcePlayer.stopLoad();
-  window.api.startLiveBuffer({
-    video: details.url,
-    audio: audioTrack?.url || '',
-    anchor: frag.sn,
-    offset: Math.max(0, video.currentTime - frag.start),
-  }).then(result => {
-    if (liveBuffer !== session) return;
-    if (!result?.url) {
-      cancelLiveBuffer();
-      sourcePlayer.startLoad(video.currentTime);
-      $('statusBar').textContent = 'Paused · live window only';
-      if (session.wantsPlayback) resumeVideo();
-      return;
-    }
-    session.result = result;
-    $('statusBar').textContent = result.exact ? 'Paused · live TV is being saved' : 'Pause point expired · earliest saved video is ready';
-    if (session.wantsPlayback) resumeLiveBuffer(session);
-  }).catch(() => {
+  $('btnLive').classList.toggle('hidden', recording);
+  $('statusBar').textContent = recording ? 'Starting recording…' : 'Paused · saving live TV…';
+  if (!recording) sourcePlayer.stopLoad();
+  updateRecordButton();
+  const failed = () => {
     if (liveBuffer !== session) return;
     cancelLiveBuffer();
-    sourcePlayer.startLoad(video.currentTime);
-    $('statusBar').textContent = 'Paused · live window only';
+    if (!recording) sourcePlayer.startLoad(video.currentTime);
+    $('statusBar').textContent = recording ? 'Recording unavailable for this stream' : 'Paused · live window only';
     if (session.wantsPlayback) resumeVideo();
-  });
+  };
+  window.api.startLiveBuffer({
+    video: hls.latestLevelDetails.url,
+    audio: audioTrack?.url || '',
+    anchor: anchor.sequence,
+    offset: anchor.offset,
+  }).then(result => {
+    if (liveBuffer !== session) return;
+    if (!result?.url) { failed(); return; }
+    session.result = result;
+    $('statusBar').textContent = recording ? 'Recording ' + session.channel.name :
+      result.exact ? 'Paused · live TV is being saved' : 'Pause point expired · earliest saved video is ready';
+    updateRecordButton();
+    if (session.wantsPlayback) resumeLiveBuffer(session);
+  }).catch(failed);
 }
 
 function resumeVideo() {
   video.play().catch(() => toast('Press play to start'));
 }
 
-function resumeLiveBuffer(session) {
+async function resumeLiveBuffer(session) {
   if (!session.result) {
     session.wantsPlayback = true;
     toast('Preparing the live buffer…');
     return;
   }
+  if (session.startingPlayback) return;
+  session.startingPlayback = true;
+  const result = session.pausedAt
+    ? await window.api.liveBufferPosition(session.pausedAt).catch(() => null)
+    : session.result;
+  if (liveBuffer !== session) return;
+  session.startingPlayback = false;
+  if (!result?.url) { resumeVideo(); return; }
   session.active = true;
-  attachSource(session.result.url, { buffered: true, offset: session.result.offset });
+  $('btnLive').classList.remove('hidden');
+  attachSource(result.url, { buffered: true, offset: result.offset });
   resumeVideo();
   $('statusBar').textContent = 'Playing saved live TV: ' + session.channel.name;
 }
@@ -783,9 +810,10 @@ function playPause() {
   if (ytActive) return;
   if (!video.src && !video.currentSrc) return;
   if (video.paused) {
-    if (liveBuffer && !liveBuffer.active) resumeLiveBuffer(liveBuffer);
+    if (liveBuffer && !liveBuffer.active && (!liveBuffer.recording || liveBuffer.pausedAt)) resumeLiveBuffer(liveBuffer);
     else resumeVideo();
   } else {
+    if (liveBuffer?.recording && !liveBuffer.active) liveBuffer.pausedAt = liveAnchor();
     video.pause();
     if (current?.kind === 'tv' && !liveBuffer) startLiveBuffer();
   }
@@ -877,6 +905,10 @@ video.addEventListener('playing', () => {
 // currentSrc check keeps a stale error from the empty-src load() in
 // attachSource from firing on a URL that never actually loaded.
 video.addEventListener('error', () => {
+  if (video.error && current?.kind === 'download' && video.currentSrc === currentStreamUrl) {
+    $('statusBar').textContent = 'This saved video could not be played. Check the file or try another video format.';
+    toast('Could not play saved video');
+  }
   if (!video.error || video.error.code !== 4) return;
   if (!current || current.kind !== 'movie') return;
   if (!currentStreamUrl || !/\.(mp4|webm|mov|mkv)(\?|$)/i.test(currentStreamUrl)) return;
@@ -888,6 +920,10 @@ video.addEventListener('error', () => {
 });
 video.addEventListener('play', syncPlayerControls);
 video.addEventListener('pause', syncPlayerControls);
+video.addEventListener('loadeddata', updatePiPButton);
+video.addEventListener('emptied', updatePiPButton);
+video.addEventListener('enterpictureinpicture', updatePiPButton);
+video.addEventListener('leavepictureinpicture', updatePiPButton);
 video.addEventListener('waiting', showPlayerBar);
 video.addEventListener('click', () => {
   if (document.fullscreenElement && !video.paused) showPlayerBar();
@@ -920,7 +956,13 @@ function showPlayerBar() {
 function syncPlayerControls() {
   $('btnPlay').textContent = video.paused ? '▶' : '❚❚';
   $('bigPlay').classList.toggle('hidden', !video.paused || !current || ytActive);
+  const savedVideo = current?.kind === 'download';
+  for (const id of ['btnPrev', 'btnNext', 'btnCC', 'btnQuality']) {
+    $(id).classList.toggle('hidden', savedVideo);
+  }
   updateAudioControl();
+  updatePiPButton();
+  updateRecordButton();
   showPlayerBar();
 }
 document.addEventListener('fullscreenchange', showPlayerBar);
@@ -931,6 +973,47 @@ $('btnLive').onclick = () => { if (liveBuffer) playChannel(liveBuffer.channel); 
 $('btnFull').onclick = () => {
   if (document.fullscreenElement) document.exitFullscreen();
   else $('playerWrap').requestFullscreen().catch(() => toast('Fullscreen not allowed'));
+};
+function updatePiPButton() {
+  const button = $('btnPiP');
+  const active = document.pictureInPictureElement === video;
+  button.disabled = !active && (!document.pictureInPictureEnabled || ytActive || !video.videoWidth);
+  button.classList.toggle('on', active);
+  button.setAttribute('aria-pressed', String(active));
+}
+async function togglePiP() {
+  try {
+    if (document.pictureInPictureElement === video) await document.exitPictureInPicture();
+    else if (!$('btnPiP').disabled) {
+      await video.requestPictureInPicture();
+      if (document.fullscreenElement) await document.exitFullscreen();
+    }
+  } catch { toast('Picture-in-Picture is unavailable for this video'); }
+  updatePiPButton();
+}
+$('btnPiP').onclick = togglePiP;
+$('btnRecord').onclick = async () => {
+  if (!liveBuffer) { startLiveBuffer(true); return; }
+  const session = liveBuffer;
+  if (savingRecording || !session.result) return;
+  savingRecording = true;
+  updateRecordButton();
+  try {
+    const saved = await window.api.saveRecording(session.channel.name);
+    if (!saved.canceled) {
+      toast('Recording saved · ' + saved.name);
+      if (liveBuffer === session && session.recording && !session.active && !video.paused) {
+        cancelLiveBuffer();
+        $('statusBar').textContent = 'Playing: ' + session.channel.name;
+      }
+      if (!$('downloadsView').classList.contains('hidden')) renderDownloads();
+    }
+  } catch {
+    toast('Could not save recording. Check the destination and try again.');
+  } finally {
+    savingRecording = false;
+    updateRecordButton();
+  }
 };
 $('btnCC').onclick = () => toggleCC();
 $('btnQuality').onclick = () => showQualityMenu();
@@ -1077,6 +1160,7 @@ function setTvLevel(index) {
   }
 }
 function showQualityMenu() {
+  if (current?.kind === 'download') return;
   const menu = $('popupMenu');
   // A YouTube embed has its own quality control (the ⚙ icon in the
   // YouTube player) — the app's quality list does not apply to it.
@@ -1115,13 +1199,15 @@ function toggleCC() {
   $('btnCC').classList.toggle('on', ccOn);
   toast(ccOn ? 'Subtitles: English ON' : 'Subtitles: OFF');
 }
-async function loadCaptionsFor(args) {
-  // args: {streamId, subjectId, detailPath}
+function clearMovieCaptions() {
   ccOn = false;
   $('btnCC').classList.remove('on');
   const old = video.querySelector('track');
   if (old) old.remove();
   if (ccTrackUrl) { URL.revokeObjectURL(ccTrackUrl); ccTrackUrl = null; }
+}
+async function loadCaptionsFor(args) {
+  clearMovieCaptions();
   try {
     const r = await window.api.mbCaptions(args);
     if (r && r.vtt) {
@@ -1222,6 +1308,7 @@ function renderContinueWatching() {
 let searchTimer = 0;
 let searchRequest = 0;
 $('movieSearch').addEventListener('input', () => {
+  toggleDownloads(false);
   searchRequest++;
   $('detailsView').classList.add('hidden');
   clearTimeout(searchTimer);
@@ -1397,6 +1484,19 @@ async function openMovieDownload(movie) {
         try {
           const result = await window.api.saveMovie(index, movie.title);
           status.textContent = result.canceled ? 'Download canceled.' : 'Saved · ' + result.name;
+          if (!result.canceled && result.librarySaved) {
+            const open = document.createElement('button');
+            open.type = 'button';
+            open.className = 'btn';
+            open.textContent = 'Open Downloads';
+            open.onclick = () => {
+              closeMovieDownload();
+              toggleDownloads(true);
+            };
+            options.append(open);
+          } else if (!result.canceled) {
+            status.textContent += ' · Use Add video in Downloads to list this file.';
+          }
         } catch {
           status.textContent = 'Download failed. Check your connection and save location, then try again.';
         } finally {
@@ -1414,6 +1514,71 @@ async function openMovieDownload(movie) {
     if (session === movieDialogSession) status.textContent = 'Could not load download qualities. Please try again.';
   }
 }
+
+let downloadsRequest = 0;
+function toggleDownloads(open) {
+  $('moviesView').classList.toggle('downloads-open', open);
+  $('downloadsView').classList.toggle('hidden', !open);
+  $('showDownloads').setAttribute('aria-expanded', String(open));
+  if (open) {
+    focusIndex = -1;
+    renderDownloads();
+  }
+}
+
+async function renderDownloads() {
+  const request = ++downloadsRequest;
+  const list = $('downloadsList');
+  const status = $('downloadsStatus');
+  try {
+    const videos = await window.api.listDownloads();
+    if (request !== downloadsRequest) return;
+    list.replaceChildren();
+    status.textContent = videos.length ? '' : 'No saved videos yet.';
+    for (const entry of videos) {
+      const row = document.createElement('div');
+      row.className = 'download-row row';
+      const play = document.createElement('button');
+      play.className = 'download-play';
+      play.textContent = entry.title;
+      play.onclick = async () => {
+        const action = ++moviePlayRequest;
+        try {
+          const source = await window.api.playDownload(entry.id);
+          if (action !== moviePlayRequest) return;
+          if (source.error) { status.textContent = source.error; return; }
+          await window.api.setMediaHeaders(null);
+          if (action !== moviePlayRequest) return;
+          clearMovieCaptions();
+          playSource(source.url, { title: source.title, meta: { kind: 'download' } });
+          $('statusBar').textContent = 'Playing saved video: ' + source.title;
+          status.textContent = '';
+        } catch { status.textContent = 'Could not open the saved video.'; }
+      };
+      const size = document.createElement('span');
+      size.className = 'meta';
+      size.textContent = (entry.bytes / 1048576).toFixed(1) + ' MB';
+      const remove = document.createElement('button');
+      remove.className = 'btn';
+      remove.textContent = 'Remove';
+      remove.title = 'Remove from Downloads list';
+      remove.onclick = async () => {
+        try { await window.api.removeDownload(entry.id); renderDownloads(); }
+        catch { status.textContent = 'Could not remove the video from the list.'; }
+      };
+      row.append(play, size, remove);
+      list.append(row);
+    }
+  } catch {
+    if (request === downloadsRequest) status.textContent = 'Could not load saved videos.';
+  }
+}
+$('showDownloads').onclick = () => toggleDownloads($('downloadsView').classList.contains('hidden'));
+$('closeDownloads').onclick = () => { toggleDownloads(false); $('showDownloads').focus(); };
+$('addDownloadedVideo').onclick = async () => {
+  try { if (await window.api.addDownloadedVideo()) renderDownloads(); }
+  catch { $('downloadsStatus').textContent = 'Could not add the selected video.'; }
+};
 
 function backToMoviesHome() {
   detailsRequest++;
@@ -1595,6 +1760,7 @@ setInterval(async () => {
 function visibleRows() {
   const active = document.querySelector('.tab.active').dataset.tab;
   if (active === 'tv') return [...$('channelList').querySelectorAll('.row')];
+  if (!$('downloadsView').classList.contains('hidden')) return [...$('downloadsList').querySelectorAll('.download-play')];
   if (!$('detailsView').classList.contains('hidden')) return [...$('detailsView').querySelectorAll('.ep-btn, #dPlay')];
   if (!$('movieResults').classList.contains('hidden')) return [...$('movieResults').querySelectorAll('.row')];
   return [...document.querySelectorAll('.card')];
@@ -1616,6 +1782,7 @@ document.addEventListener('keydown', (e) => {
     if (!$('popupMenu').classList.contains('hidden')) { closePopup(); return; }
     if (!$('arrangeMenu').classList.contains('hidden')) { closeArrangeMenu(); return; }
     if (document.fullscreenElement) { document.exitFullscreen(); return; }
+    if (state.lastTab === 'movies' && !$('downloadsView').classList.contains('hidden')) { $('closeDownloads').click(); return; }
     if (state.lastTab === 'movies' && !$('detailsView').classList.contains('hidden')) { backToMoviesHome(); return; }
     return;
   }
@@ -1638,6 +1805,7 @@ document.addEventListener('keydown', (e) => {
     }
     case ' ': e.preventDefault(); playPause(); break;
     case 'f': case 'F': $('btnFull').click(); break;
+    case 'p': case 'P': togglePiP(); break;
     case 'c': case 'C': toggleCC(); break;
     case 'q': case 'Q': showQualityMenu(); break;
     case '+': case '=': video.volume = Math.min(1, video.volume + 0.1); video.muted = false; toast('Volume: ' + Math.round(video.volume * 100) + '%'); break;

@@ -1,0 +1,8 @@
+1. Picture-in-Picture
+Live TV, movies aur saved videos par PiP button ya P key se chhoti floating window kholein.
+
+2. Live TV recording
+Supported HLS channels par Record dabayein. Save recording se MP4 apne pasand ke folder ya external drive par save karein. Paused live buffer ko bhi MP4 mein save kar sakte hain.
+
+3. Downloads
+Movies & Series ke Downloads mein saved recordings aur downloaded movies dobara dekhein. Add video se pehle se maujood files bhi shamil kar sakte hain.

@@ -12,6 +12,7 @@ const { pathToFileURL } = require('url');
 
 const moviebox = require('./moviebox');
 const { defaultName, saveMovie } = require('./movie-download');
+const { createDownloadLibrary } = require('./download-library');
 const updater = require('./updater');
 const transcode = require('./transcode');
 const liveBuffer = require('./live-buffer');
@@ -204,6 +205,7 @@ app.on('window-all-closed', () => {
 
 // Never leave a transcode ffmpeg running after the app quits.
 app.on('before-quit', () => {
+  liveBuffer.cancelExport();
   liveBuffer.stop();
   try { transcode.shutdown(); } catch (_) {}
 });
@@ -259,6 +261,21 @@ ipcMain.handle('live-buffer:start', (event, options) => isAppFrame(event) && opt
   ? liveBuffer.start(options) : { error: 'Invalid live buffer request' });
 ipcMain.handle('live-buffer:stop', event => { if (isAppFrame(event)) liveBuffer.stop(); });
 ipcMain.handle('live-buffer:status', event => isAppFrame(event) ? liveBuffer.status() : null);
+ipcMain.handle('live-buffer:position', (event, anchor) => isAppFrame(event) && anchor ? liveBuffer.position(anchor) : null);
+ipcMain.handle('live-buffer:export', async (event, title) => {
+  if (!isAppFrame(event)) throw new Error('Invalid window');
+  const label = String(title || 'Live TV').trim() + ' recording';
+  const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+    title: 'Save recording as', defaultPath: path.join(app.getPath('downloads'), defaultName(label)),
+    filters: [{ name: 'MP4 video', extensions: ['mp4'] }],
+  });
+  if (canceled || !filePath) return { canceled: true };
+  if (!/\.mp4$/i.test(filePath)) throw new Error('Choose an MP4 file name');
+  await liveBuffer.exportRecording(filePath, transcode.status().ffmpeg);
+  try { movieLibrary().add(filePath, label); }
+  catch (error) { console.error('Could not register exported recording:', error.message); }
+  return { name: path.basename(filePath) };
+});
 
 // Custom title bar (frameless window, v1.0.3): minimise / maximise / close.
 ipcMain.handle('window:minimize', () => { if (mainWindow) mainWindow.minimize(); return true; });
@@ -345,7 +362,13 @@ ipcMain.handle('movie:save', async (event, index, title) => {
     };
     progress(0, 0);
     await saveMovie(source, filePath, controller.signal, progress);
-    return { name: path.basename(filePath) };
+    let librarySaved = true;
+    try { movieLibrary().add(filePath, String(title || '').trim()); }
+    catch (error) {
+      librarySaved = false;
+      console.error('Could not register downloaded video:', error.message);
+    }
+    return { name: path.basename(filePath), librarySaved };
   } catch (error) {
     if (controller.signal.aborted) return { canceled: true };
     throw error;
@@ -355,5 +378,31 @@ ipcMain.handle('movie:save', async (event, index, title) => {
   }
 });
 ipcMain.handle('movie:cancel', event => { if (isAppFrame(event)) movieTransfer?.abort(); });
+function movieLibrary() {
+  return createDownloadLibrary(path.join(app.getPath('userData'), 'downloads.json'));
+}
+ipcMain.handle('downloads:list', event => {
+  if (!isAppFrame(event)) throw new Error('Invalid window');
+  return movieLibrary().list();
+});
+ipcMain.handle('downloads:add', async event => {
+  if (!isAppFrame(event)) throw new Error('Invalid window');
+  const picked = await dialog.showOpenDialog(mainWindow, {
+    title: 'Add a downloaded video', defaultPath: app.getPath('downloads'),
+    properties: ['openFile'], filters: [{ name: 'Video files', extensions: ['mp4', 'm4v', 'webm', 'mov', 'mkv'] }],
+  });
+  if (picked.canceled || !picked.filePaths[0]) return false;
+  movieLibrary().add(picked.filePaths[0]);
+  return true;
+});
+ipcMain.handle('downloads:play', (event, id) => {
+  if (!isAppFrame(event)) throw new Error('Invalid window');
+  try { return movieLibrary().open(id); }
+  catch (error) { return { error: error.message }; }
+});
+ipcMain.handle('downloads:remove', (event, id) => {
+  if (!isAppFrame(event)) throw new Error('Invalid window');
+  movieLibrary().remove(id);
+});
 ipcMain.handle('mb:captions', (_e, args) => moviebox.getEnglishCaptions(args));
 ipcMain.handle('mb:feed', (_e, args) => moviebox.getFeed(args || {}));

@@ -303,6 +303,7 @@ body.split-dragging, body.split-dragging * { cursor: col-resize !important; }
 #playerWrap:fullscreen .chip-btn { border-radius: 6px; }
 .chip-btn.step-btn { background: transparent; border-color: transparent; }
 .chip-btn.on { background: var(--teal); border-color: var(--teal); }
+.chip-btn:disabled { opacity: 0.5; cursor: default; }
 #seek {
   flex: 1; appearance: none; height: 4px; min-width: 30px; cursor: pointer; border-radius: 4px;
   background: linear-gradient(to right, var(--red) 0 var(--progress, 0%), #3d3d42 var(--progress, 0%) 100%);
@@ -369,6 +370,17 @@ dialog.dialog::backdrop { background: rgba(6,11,24,.62); backdrop-filter: blur(4
 }
 .d-summary { margin-top: 12px; color: var(--muted2); }
 .d-summary summary { cursor: pointer; }
+#moviesView.downloads-open > :is(#moviesHome, #movieResults, #detailsView) { display: none; }
+#downloadsView { padding: 0 12px 10px; }
+.downloads-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 8px; }
+.downloads-heading h2 { font-size: 16px; margin-right: auto; }
+.downloads-status { color: var(--muted2); font-size: 13px; margin-bottom: 8px; }
+.downloads-status:empty { display: none; }
+.download-row .download-play {
+  flex: 1; min-width: 0; border: 0; background: none; text-align: left; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 6px;
+}
+.download-row .btn { padding: 4px 7px; }
 .actions #dPlay { flex: 1 0 100%; }
 .actions .btn { text-align: center; border-radius: var(--radius); }
 .btn:disabled { opacity: .55; cursor: wait; }
